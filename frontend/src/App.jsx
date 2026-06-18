@@ -102,9 +102,9 @@ const priorityTone = {
 const cx = (...classes) => classes.filter(Boolean).join(" ");
 
 const inputClass =
-  "w-full rounded-lg border border-zinc-200 bg-white px-3 py-2 text-sm " +
+  "w-full rounded-lg border border-zinc-200/80 bg-white/95 px-3 py-2 text-sm " +
   "text-zinc-950 outline-none transition placeholder:text-zinc-400 " +
-  "focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100";
+  "focus:border-zinc-400 focus:ring-4 focus:ring-zinc-100/80";
 
 async function apiRequest(path, options = {}) {
   const response = await fetch(`${API_BASE_URL}${path}`, {
@@ -228,7 +228,7 @@ function getSlaMeta(value) {
 
   return {
     label: formatDateTime(value),
-    tone: "border-zinc-200 bg-zinc-50 text-zinc-700",
+    tone: "border-zinc-200/80 bg-zinc-50/60 text-zinc-700",
     urgency: Math.max(5, 60 - diffHours),
   };
 }
@@ -269,12 +269,12 @@ function App() {
   const activeViewConfig = views.find((view) => view.id === activeView);
 
   return (
-    <main className="min-h-screen bg-[#f7f7f8] text-zinc-950">
-      <div className="border-b border-zinc-200 bg-white/90 backdrop-blur">
+    <main className="min-h-screen bg-[#f8f9fa] text-zinc-950 selection:bg-zinc-200/60">
+      <div className="border-b border-zinc-200/80 bg-white/80 shadow-sm shadow-zinc-100/50 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-zinc-200 bg-zinc-950 text-white shadow-sm">
+              <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-zinc-200/80 bg-zinc-900 text-white shadow-sm shadow-zinc-200/50">
                 <Layers3 className="h-5 w-5" aria-hidden="true" />
               </div>
               <div className="min-w-0">
@@ -287,18 +287,18 @@ function App() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
-              <span className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2">
+              <span className="inline-flex items-center gap-2 rounded-lg border border-zinc-200/80 bg-white/75 px-3 py-2 shadow-sm shadow-zinc-100/40">
                 <Radio className="h-3.5 w-3.5 text-emerald-600" />
                 API {API_BASE_URL}
               </span>
-              <span className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-white px-3 py-2">
+              <span className="inline-flex items-center gap-2 rounded-lg border border-zinc-200/80 bg-white/75 px-3 py-2 shadow-sm shadow-zinc-100/40">
                 <Activity className="h-3.5 w-3.5 text-sky-600" />
                 Live demo controls
               </span>
             </div>
           </div>
 
-          <div className="grid gap-2 rounded-lg border border-zinc-200 bg-zinc-100 p-1 md:grid-cols-3">
+          <div className="grid gap-2 rounded-lg border border-zinc-200/80 bg-white/65 p-1.5 shadow-sm shadow-zinc-100/50 backdrop-blur md:grid-cols-3">
             {views.map((view) => {
               const Icon = view.icon;
               const isActive = activeView === view.id;
@@ -311,8 +311,8 @@ function App() {
                   className={cx(
                     "flex items-center justify-between rounded-md px-3 py-2.5 text-left transition",
                     isActive
-                      ? "bg-white text-zinc-950 shadow-sm ring-1 ring-zinc-200"
-                      : "text-zinc-600 hover:bg-white/70 hover:text-zinc-950",
+                      ? "scale-[1.01] bg-zinc-950 text-white shadow-md shadow-zinc-950/10"
+                      : "text-zinc-600 hover:bg-white/80 hover:text-zinc-900",
                   )}
                 >
                   <span className="flex min-w-0 items-center gap-3">
@@ -321,7 +321,12 @@ function App() {
                       <span className="block truncate text-sm font-semibold">
                         {view.label}
                       </span>
-                      <span className="block text-xs text-zinc-500">
+                      <span
+                        className={cx(
+                          "block text-xs",
+                          isActive ? "text-zinc-300" : "text-zinc-500",
+                        )}
+                      >
                         {view.eyebrow}
                       </span>
                     </span>
@@ -329,7 +334,7 @@ function App() {
                   <ChevronRight
                     className={cx(
                       "h-4 w-4 shrink-0",
-                      isActive ? "text-zinc-950" : "text-zinc-400",
+                      isActive ? "text-white" : "text-zinc-400",
                     )}
                     aria-hidden="true"
                   />
@@ -340,7 +345,7 @@ function App() {
         </div>
       </div>
 
-      <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
         {activeView === "citizen" && <CitizenPortal />}
         {activeView === "officer" && <FieldOfficerDesk />}
         {activeView === "executive" && <ExecutiveHub />}
@@ -409,7 +414,7 @@ function CitizenPortal() {
         description: form.description.trim(),
         intake_photo_url: form.intake_photo_url.trim() || undefined,
       };
-      const data = await apiRequest("/api/v1/grid/grievances/intake", {
+      const data = await apiRequest("/api/v1/grievances/intake", {
         method: "POST",
         body: JSON.stringify(payload),
       });
@@ -460,7 +465,7 @@ function CitizenPortal() {
 
   return (
     <div className="grid gap-5 lg:grid-cols-[1.35fr_0.85fr]">
-      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <section className="rounded-lg border border-zinc-200/80 bg-white p-5 shadow-sm shadow-zinc-100/50">
         <div className="mb-5 flex items-start justify-between gap-4">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
@@ -470,7 +475,7 @@ function CitizenPortal() {
               New grievance intake
             </h2>
           </div>
-          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-2 text-emerald-700">
+          <div className="rounded-lg border border-emerald-100/80 bg-emerald-50/50 p-2 text-emerald-700">
             <SendHorizonal className="h-5 w-5" aria-hidden="true" />
           </div>
         </div>
@@ -596,7 +601,7 @@ function CitizenPortal() {
       </section>
 
       <div className="grid gap-5">
-        <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-zinc-200/80 bg-white p-5 shadow-sm shadow-zinc-100/50">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
@@ -611,7 +616,7 @@ function CitizenPortal() {
 
           {result ? (
             <div className="mt-5 space-y-4">
-              <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+              <div className="rounded-lg border border-emerald-100/80 bg-emerald-50/50 p-4">
                 <div className="flex items-start gap-3">
                   <CheckCircle2
                     className="mt-0.5 h-5 w-5 text-emerald-700"
@@ -633,7 +638,7 @@ function CitizenPortal() {
                 <MetricPill label="Priority" value={result.priority} />
               </div>
 
-              <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+              <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-4">
                 <div className="flex items-center justify-between gap-3">
                   <span className="text-sm font-medium text-zinc-600">
                     SLA countdown
@@ -643,7 +648,7 @@ function CitizenPortal() {
                 <p className="mt-3 font-mono text-2xl font-semibold text-zinc-950">
                   {countdown.expired ? "Breached" : countdown.text}
                 </p>
-                <div className="mt-3 h-2 rounded-full bg-zinc-200">
+                <div className="mt-3 h-2 rounded-full bg-zinc-200/70">
                   <div
                     className={cx(
                       "h-2 rounded-full transition-all duration-500",
@@ -666,7 +671,7 @@ function CitizenPortal() {
           )}
         </section>
 
-        <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-zinc-200/80 bg-white p-5 shadow-sm shadow-zinc-100/50">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
@@ -715,7 +720,7 @@ function CitizenPortal() {
             )}
 
             <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-100 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400"
+              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-rose-100/80 bg-rose-50/60 px-4 text-sm font-semibold text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:border-zinc-200 disabled:bg-zinc-100 disabled:text-zinc-400"
               disabled={
                 reopenLoading
                 || !reopenForm.ticket_id.trim()
@@ -866,7 +871,7 @@ function FieldOfficerDesk() {
 
   return (
     <div className="grid gap-5">
-      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <section className="rounded-lg border border-zinc-200/80 bg-white p-5 shadow-sm shadow-zinc-100/50">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
@@ -877,18 +882,18 @@ function FieldOfficerDesk() {
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+            <label className="flex items-center gap-2 rounded-lg border border-zinc-200/80 bg-zinc-50/60 px-3 py-2 text-sm text-zinc-600">
               <LockKeyhole className="h-4 w-4 text-zinc-500" />
               Officer ID
               <input
-                className="h-7 w-20 rounded-md border border-zinc-200 bg-white px-2 text-sm font-semibold text-zinc-950 outline-none focus:border-zinc-400"
+                className="h-7 w-20 rounded-md border border-zinc-200/80 bg-white px-2 text-sm font-semibold text-zinc-950 outline-none focus:border-zinc-400 focus:ring-2 focus:ring-zinc-100/80"
                 min="1"
                 type="number"
                 value={officerId}
                 onChange={(event) => setOfficerId(event.target.value)}
               />
             </label>
-            <span className="inline-flex items-center gap-2 rounded-lg border border-zinc-200 bg-zinc-50 px-3 py-2 text-sm text-zinc-600">
+            <span className="inline-flex items-center gap-2 rounded-lg border border-zinc-200/80 bg-zinc-50/60 px-3 py-2 text-sm text-zinc-600">
               <CircleDot className="h-4 w-4 text-emerald-600" />
               {queue.length} active
             </span>
@@ -906,9 +911,9 @@ function FieldOfficerDesk() {
           </div>
         )}
 
-        <div className="mt-5 overflow-x-auto rounded-lg border border-zinc-200">
+        <div className="mt-5 overflow-x-auto rounded-lg border border-zinc-200/80 bg-white shadow-sm shadow-zinc-100/40">
           <div className="min-w-[760px]">
-            <div className="grid grid-cols-[1.25fr_2fr_0.85fr_1fr_0.9fr] gap-3 bg-zinc-50 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
+            <div className="grid grid-cols-[1.25fr_2fr_0.85fr_1fr_0.9fr] gap-3 border-b border-zinc-200/80 bg-zinc-50/80 px-4 py-3 text-xs font-semibold uppercase tracking-[0.12em] text-zinc-500">
               <span>Ticket ID</span>
               <span>Title</span>
               <span>Priority</span>
@@ -916,7 +921,7 @@ function FieldOfficerDesk() {
               <span className="text-right">Action</span>
             </div>
 
-            <div className="divide-y divide-zinc-100 bg-white">
+            <div className="divide-y divide-zinc-100/80 bg-white">
               {loadingQueue ? (
                 <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm font-medium text-zinc-500">
                   <Loader2
@@ -930,13 +935,16 @@ function FieldOfficerDesk() {
                   No open complaints assigned to this officer ward.
                 </div>
               ) : (
-                sortedQueue.map((ticket) => {
+                sortedQueue.map((ticket, idx) => {
                   const sla = getSlaMeta(ticket.sla_due_date);
 
                   return (
                     <div
                       key={ticket.ticket_id}
-                      className="grid grid-cols-[1.25fr_2fr_0.85fr_1fr_0.9fr] items-center gap-3 px-4 py-3 text-sm transition hover:bg-zinc-50"
+                      className={cx(
+                        "grid grid-cols-[1.25fr_2fr_0.85fr_1fr_0.9fr] items-center gap-3 px-4 py-3 text-sm transition hover:bg-zinc-50/70",
+                        idx % 2 === 0 ? "bg-white" : "bg-zinc-50/20",
+                      )}
                     >
                       <span className="min-w-0 break-all font-mono text-xs font-medium text-zinc-700">
                         {ticket.ticket_id}
@@ -975,9 +983,9 @@ function FieldOfficerDesk() {
       </section>
 
       {selectedTicket && (
-        <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/50 p-4 backdrop-blur-sm">
-          <section className="w-full max-w-2xl rounded-lg border border-zinc-200 bg-white shadow-2xl">
-            <div className="flex items-start justify-between gap-4 border-b border-zinc-200 p-5">
+        <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/40 p-4 backdrop-blur-sm">
+          <section className="w-full max-w-2xl rounded-lg border border-zinc-200/80 bg-white shadow-2xl shadow-zinc-950/10 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-start justify-between gap-4 border-b border-zinc-200/80 bg-zinc-50/40 p-5">
               <div>
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
                   Resolution Evidence
@@ -991,7 +999,7 @@ function FieldOfficerDesk() {
               </div>
               <button
                 aria-label="Close resolution modal"
-                className="grid h-9 w-9 place-items-center rounded-lg border border-zinc-200 text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-950"
+                className="grid h-9 w-9 place-items-center rounded-lg border border-zinc-200/80 bg-white text-zinc-500 transition hover:bg-zinc-50 hover:text-zinc-950"
                 onClick={closeResolution}
                 type="button"
               >
@@ -1018,7 +1026,7 @@ function FieldOfficerDesk() {
                       setResolutionPhotoUrl(event.target.value)
                     }
                   />
-                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-500">
+                  <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-zinc-200/80 bg-zinc-50/60 text-zinc-500">
                     <ImagePlus className="h-4 w-4" aria-hidden="true" />
                   </div>
                 </div>
@@ -1028,7 +1036,7 @@ function FieldOfficerDesk() {
 
               <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
                 <button
-                  className="h-10 rounded-lg border border-zinc-200 px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
+                  className="h-10 rounded-lg border border-zinc-200/80 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50"
                   onClick={closeResolution}
                   type="button"
                 >
@@ -1140,7 +1148,7 @@ function ExecutiveHub() {
 
   return (
     <div className="grid gap-5">
-      <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+      <section className="rounded-lg border border-zinc-200/80 bg-white p-5 shadow-sm shadow-zinc-100/50">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
@@ -1151,7 +1159,7 @@ function ExecutiveHub() {
             </h2>
           </div>
           <button
-            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-zinc-200 bg-white px-4 text-sm font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:text-zinc-400"
+            className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-zinc-200/80 bg-white px-4 text-sm font-semibold text-zinc-700 shadow-sm shadow-zinc-100/40 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:text-zinc-400"
             disabled={loading}
             onClick={loadExecutiveAlerts}
             type="button"
@@ -1171,32 +1179,36 @@ function ExecutiveHub() {
           <KpiCard
             icon={Gauge}
             label="Total Grievances"
-            tone="text-zinc-950"
+            surface="bg-zinc-50/50 border-zinc-200/80 shadow-sm shadow-zinc-100/20"
+            tone="text-zinc-900"
             value={metrics.total_complaints}
           />
           <KpiCard
             icon={Clock3}
             label="Active Pending"
-            tone="text-amber-700"
+            surface="bg-amber-50/40 border-amber-200/60 text-amber-900"
+            tone="text-amber-900"
             value={activePending}
           />
           <KpiCard
             icon={CheckCircle2}
             label="Verified Resolved"
-            tone="text-emerald-700"
+            surface="bg-emerald-50/40 border-emerald-200/60 text-emerald-900"
+            tone="text-emerald-900"
             value={metrics.resolved_count}
           />
           <KpiCard
             icon={RefreshCcw}
             label="Reopened Tickets"
-            tone="text-rose-700"
+            surface="bg-rose-50/40 border-rose-200/60 text-rose-900"
+            tone="text-rose-900"
             value={metrics.reopened_count}
           />
         </div>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-zinc-200/80 bg-white p-5 shadow-sm shadow-zinc-100/50">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
@@ -1234,7 +1246,7 @@ function ExecutiveHub() {
           )}
         </section>
 
-        <section className="rounded-lg border border-zinc-200 bg-white p-5 shadow-sm">
+        <section className="rounded-lg border border-zinc-200/80 bg-white p-5 shadow-sm shadow-zinc-100/50">
           <div className="mb-4 flex items-center justify-between gap-3">
             <div>
               <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
@@ -1247,7 +1259,7 @@ function ExecutiveHub() {
             <Building2 className="h-5 w-5 text-zinc-500" aria-hidden="true" />
           </div>
 
-          <div className="h-80">
+          <div className="h-80 rounded-lg border border-zinc-200/80 bg-zinc-50/30 p-3">
             <ResponsiveContainer height="100%" width="100%">
               <BarChart data={chartData} margin={{ left: 0, right: 8 }}>
                 <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
@@ -1287,18 +1299,18 @@ function AlertCard({ alert }) {
   const isSla = alert.type === "administrative_sla_breach";
   const Icon = isSla ? Siren : AlertTriangle;
   const tone = isSla
-    ? "border-rose-200 bg-rose-50 text-rose-900"
+    ? "border-rose-100/80 bg-rose-50/50 text-rose-900"
     : isCluster
-      ? "border-amber-200 bg-amber-50 text-amber-900"
-      : "border-zinc-200 bg-zinc-50 text-zinc-900";
+      ? "border-amber-100/80 bg-amber-50/50 text-amber-900"
+      : "border-zinc-200/80 bg-zinc-50/60 text-zinc-900";
   const iconTone = isSla
-    ? "bg-rose-100 text-rose-700"
+    ? "bg-rose-100/70 text-rose-700"
     : isCluster
-      ? "bg-amber-100 text-amber-700"
-      : "bg-zinc-100 text-zinc-700";
+      ? "bg-amber-100/70 text-amber-700"
+      : "bg-zinc-100/80 text-zinc-700";
 
   return (
-    <article className={cx("rounded-lg border p-4", tone)}>
+    <article className={cx("rounded-lg border p-4 shadow-sm shadow-zinc-100/30", tone)}>
       <div className="flex items-start gap-3">
         <div className={cx("grid h-9 w-9 shrink-0 place-items-center rounded-lg", iconTone)}>
           <Icon className="h-4 w-4" aria-hidden="true" />
@@ -1312,7 +1324,7 @@ function AlertCard({ alert }) {
                   ? "Geographic cluster surge"
                   : "Executive signal"}
             </p>
-            <span className="rounded-md bg-white/70 px-2 py-0.5 text-xs font-medium">
+            <span className="rounded-md border border-white/70 bg-white/75 px-2 py-0.5 text-xs font-medium">
               {alert.severity}
             </span>
           </div>
@@ -1356,7 +1368,7 @@ function AlertCard({ alert }) {
 
 function AlertDatum({ label, value }) {
   return (
-    <div className="rounded-md bg-white/70 px-3 py-2">
+    <div className="rounded-md border border-white/70 bg-white/75 px-3 py-2">
       <p className="font-medium uppercase tracking-[0.12em] opacity-60">
         {label}
       </p>
@@ -1365,9 +1377,9 @@ function AlertDatum({ label, value }) {
   );
 }
 
-function KpiCard({ icon: Icon, label, value, tone }) {
+function KpiCard({ icon: Icon, label, value, surface, tone }) {
   return (
-    <article className="rounded-lg border border-zinc-200 bg-zinc-50 p-4">
+    <article className={cx("rounded-lg border p-4", surface)}>
       <div className="flex items-center justify-between gap-3">
         <p className="text-sm font-medium text-zinc-600">{label}</p>
         <Icon className={cx("h-4 w-4", tone)} aria-hidden="true" />
@@ -1381,7 +1393,7 @@ function KpiCard({ icon: Icon, label, value, tone }) {
 
 function MetricPill({ label, value }) {
   return (
-    <div className="rounded-lg border border-zinc-200 bg-zinc-50 p-3">
+    <div className="rounded-lg border border-zinc-200/80 bg-zinc-50/50 p-3">
       <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">
         {label}
       </p>
@@ -1414,7 +1426,7 @@ function Field({ label, children }) {
 
 function InlineError({ message }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+    <div className="flex items-start gap-2 rounded-lg border border-rose-100/80 bg-rose-50/60 px-3 py-2 text-sm text-rose-700">
       <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <span>{message}</span>
     </div>
@@ -1423,7 +1435,7 @@ function InlineError({ message }) {
 
 function InlineSuccess({ message }) {
   return (
-    <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">
+    <div className="flex items-start gap-2 rounded-lg border border-emerald-100/80 bg-emerald-50/60 px-3 py-2 text-sm text-emerald-700">
       <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
       <span>{message}</span>
     </div>
@@ -1432,9 +1444,9 @@ function InlineSuccess({ message }) {
 
 function EmptyState({ icon: Icon, title, detail, spinning = false }) {
   return (
-    <div className="mt-5 grid min-h-44 place-items-center rounded-lg border border-dashed border-zinc-200 bg-zinc-50 p-6 text-center">
+    <div className="mt-5 grid min-h-44 place-items-center rounded-lg border border-dashed border-zinc-200/80 bg-zinc-50/40 p-6 text-center">
       <div>
-        <div className="mx-auto grid h-10 w-10 place-items-center rounded-lg border border-zinc-200 bg-white text-zinc-500">
+        <div className="mx-auto grid h-10 w-10 place-items-center rounded-lg border border-zinc-200/80 bg-white text-zinc-500 shadow-sm shadow-zinc-100/40">
           <Icon
             className={cx("h-5 w-5", spinning && "animate-spin")}
             aria-hidden="true"
