@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer base {
+  body {
+    @apply bg-gradient-to-br from-[#f4f3ef] via-[#faf9f7] to-[#f4f3ef];
+  }
+}
+
 @layer utilities {
   @keyframes enter {
     from {
@@ -16,6 +22,15 @@
     }
     to {
       transform: translateX(-50%);
+    }
+  }
+
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+    100% {
+      background-position: 1000px 0;
     }
   }
 
@@ -39,8 +54,22 @@
     --tw-enter-scale: 0.95;
   }
 
+  .shimmer {
+    background: linear-gradient(
+      90deg,
+      #f4f3ef 25%,
+      #faf9f7 50%,
+      #f4f3ef 75%
+    );
+    background-size: 1000px 100%;
+    animation: shimmer 2s infinite;
+  }
+
   @media (prefers-reduced-motion: reduce) {
     .ticker-track {
+      animation: none;
+    }
+    .shimmer {
       animation: none;
     }
   }
