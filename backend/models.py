@@ -23,7 +23,7 @@ post_status_enum = ENUM(
     "Under Verification",
     "In Progress",
     "Verified Resolved",
-    "Reopened",
+    "Reopened via Citizen Veto",
     "Rejected",
     name="post_status",
     validate_strings=True,
@@ -55,6 +55,14 @@ comm_channel_enum = ENUM(
     validate_strings=True,
 )
 
+cultural_asset_type_enum = ENUM(
+    "Dham Recipe",
+    "Handloom Motif",
+    "Deity Festival",
+    name="cultural_asset_type",
+    validate_strings=True,
+)
+
 
 class District(Base):
     __tablename__ = "districts"
@@ -64,6 +72,7 @@ class District(Base):
 
     officers = relationship("Officer", back_populates="service_district")
     grievances = relationship("Grievance", back_populates="district_record")
+    cultural_assets = relationship("CulturalAsset", back_populates="district")
 
 
 class Department(Base):
@@ -124,6 +133,7 @@ class Citizen(Base):
     otp_hash = Column(String, nullable=True)
 
     grievances = relationship("Grievance", back_populates="citizen")
+    veto_records = relationship("CitizenVeto", back_populates="citizen")
 
 
 class Officer(Base):
@@ -273,6 +283,58 @@ class Grievance(Base):
     district_record = relationship("District", back_populates="grievances")
     logs = relationship("GrievanceLog", back_populates="grievance")
     notifications = relationship("Notification", back_populates="grievance")
+    veto_records = relationship("CitizenVeto", back_populates="grievance")
+
+
+class CitizenVeto(Base):
+    """Tracks citizen-initiated vetoes on resolved grievances with ground evidence."""
+    __tablename__ = "citizen_vetoes"
+
+    id = Column(Integer, primary_key=True)
+    grievance_id = Column(
+        Integer,
+        ForeignKey("grievances.id"),
+        nullable=False,
+    )
+    citizen_id = Column(
+        Integer,
+        ForeignKey("citizens.id"),
+        nullable=False,
+    )
+    veto_remarks = Column(Text, nullable=False)
+    evidence_photo_url = Column(String(255), nullable=True)
+    filed_at = Column(
+        TIMESTAMP(timezone=False),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    grievance = relationship("Grievance", back_populates="veto_records")
+    citizen = relationship("Citizen", back_populates="veto_records")
+
+
+class CulturalAsset(Base):
+    """Heritage assets: Dham recipes, handloom motifs, deity festivals."""
+    __tablename__ = "cultural_assets"
+
+    id = Column(Integer, primary_key=True)
+    district_id = Column(
+        Integer,
+        ForeignKey("districts.id"),
+        nullable=False,
+    )
+    asset_type = Column(cultural_asset_type_enum, nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False)
+    image_url = Column(String(255), nullable=True)
+    metadata = Column(Text, nullable=True)  # JSON-serialized regional details
+    created_at = Column(
+        TIMESTAMP(timezone=False),
+        nullable=False,
+        server_default=func.now(),
+    )
+
+    district = relationship("District", back_populates="cultural_assets")
 
 
 class GrievanceLog(Base):

@@ -18,6 +18,8 @@ from security import hash_password, verify_password
 from models import (
     Category,
     Citizen,
+    CitizenVeto,
+    CulturalAsset,
     Department,
     District,
     Grievance,
@@ -31,10 +33,10 @@ MUNICIPAL_REGION = os.getenv("MUNICIPAL_REGION", "HIMACHAL_PRADESH")
 MONSOON_COMMAND_STATE = os.getenv("MONSOON_COMMAND_STATE", "ACTIVE")
 
 UPVOTE_CRITICAL_THRESHOLD = 30
-ACTIVE_STATUSES = ("Pending", "Under Verification", "In Progress", "Reopened")
+ACTIVE_STATUSES = ("Pending", "Under Verification", "In Progress", "Reopened via Citizen Veto")
 SLA_MONITOR_INTERVAL_SECONDS = 60
 
-HIMACHAL_ADMIN_HIERARCHY: Dict[str, Dict[str, List[str]]] = {
+HIMAMACHAL_ADMIN_HIERARCHY: Dict[str, Dict[str, List[str]]] = {
     "Kullu": {
         "Anni": ["Draman", "Kungash", "Lajheri"],
         "Bhuntar": ["Bari", "Sainj", "Jari"],
@@ -101,8 +103,9 @@ DEFAULT_COORDINATES_BY_DISTRICT = {
 sla_monitor_thread: Optional[threading.Thread] = None
 
 app = FastAPI(
-    title="HimSetu Structural Backplane Core",
-    version="2.1.0",
+    title="HimSetu: Unified Civic Accountability & Heritage Platform",
+    version="3.0.0",
+    description="Localized multi-tenant civic oversight with regional cultural preservation for Himachal Pradesh",
 )
 
 app.add_middleware(
@@ -182,6 +185,25 @@ class GrievanceReopenResponse(BaseModel):
     sla_due_date: datetime
     log_id: int
 
+class CitizenVetoRequest(BaseModel):
+    veto_remarks: str
+    evidence_photo_url: Optional[str] = None
+
+class CitizenVetoResponse(BaseModel):
+    ticket_id: str
+    previous_status: str
+    new_status: str
+    veto_id: int
+
+class CulturalAssetResponse(BaseModel):
+    id: int
+    district: str
+    asset_type: str
+    title: str
+    description: str
+    image_url: Optional[str]
+    metadata: Optional[str]
+
 def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -197,11 +219,11 @@ def require_non_empty(value: Optional[str], field_name: str) -> str:
     return value.strip()
 
 def validate_location_hierarchy(district: str, block: str, panchayat: str) -> None:
-    block_map = HIMACHAL_ADMIN_HIERARCHY.get(district)
+    block_map = HIMAMACHAL_ADMIN_HIERARCHY.get(district)
     if block_map is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"district must be one of: {', '.join(HIMACHAL_ADMIN_HIERARCHY.keys())}.",
+            detail=f"district must be one of: {', '.join(HIMAMACHAL_ADMIN_HIERARCHY.keys())}.",
         )
 
     panchayats = block_map.get(block)
@@ -338,7 +360,7 @@ def bootstrap_database() -> None:
     try:
         districts = {
             district_name: get_or_create_district(db, district_name)
-            for district_name in HIMACHAL_ADMIN_HIERARCHY
+            for district_name in HIMAMACHAL_ADMIN_HIERARCHY
         }
         departments = {
             department_name: get_or_create_department(db, department_name)
@@ -418,6 +440,9 @@ def bootstrap_database() -> None:
 
         if db.query(Grievance.id).first() is None:
             seed_bootstrap_grievances(db, citizen, districts, departments, subcategories)
+
+        if db.query(CulturalAsset.id).first() is None:
+            seed_cultural_assets(db, districts)
 
         db.commit()
     except Exception:
@@ -521,6 +546,89 @@ def seed_bootstrap_grievances(
             created_at=created_at,
             updated_at=created_at,
         ))
+
+def seed_cultural_assets(db: Session, districts: Dict[str, District]) -> None:
+    """Seed heritage content to fuel daily user engagement."""
+    assets = [
+        # Kullu Dham & Heritage
+        {
+            "district_id": districts["Kullu"].id,
+            "asset_type": "Dham Recipe",
+            "title": "Sepu Badi (Kullu Summer Feast)",
+            "description": "Traditional multi-course feast combining slow-cooked rice, kidney beans, and yogurt curries. Served during monsoon festivals.",
+            "metadata": '{"season": "monsoon", "preparation_hours": 8}',
+        },
+        {
+            "district_id": districts["Kullu"].id,
+            "asset_type": "Handloom Motif",
+            "title": "Kullu Shawl Diamond Cross-Stitch",
+            "description": "Signature geometric diamond lattice pattern found on Kullu shawls, representing mountain peaks and terraced fields.",
+            "metadata": '{"colors": ["crimson", "gold", "indigo"], "stitches_per_inch": 12}',
+        },
+        # Mandi Heritage
+        {
+            "district_id": districts["Mandi"].id,
+            "asset_type": "Dham Recipe",
+            "title": "Mandiyali Khir (Mandi Wedding Rice Pudding)",
+            "description": "Sacred rice pudding slow-cooked with ghee and dry fruits, served at all Mandi ceremonial gatherings.",
+            "metadata": '{"season": "year-round", "primary_ingredient": "basmati rice"}',
+        },
+        {
+            "district_id": districts["Mandi"].id,
+            "asset_type": "Deity Festival",
+            "title": "Baisakhi Dussehra (Spring Deity Assembly)",
+            "description": "Annual gathering of village deities carried through mountain paths. Travel routes close during the festival week.",
+            "metadata": '{"month": "April", "duration_days": 7}',
+        },
+        # Kangra Heritage
+        {
+            "district_id": districts["Kangra"].id,
+            "asset_type": "Handloom Motif",
+            "title": "Kinnauri Cap (Nada) Geometric Embroidery",
+            "description": "Complex geometric spirals and sun-symbols embroidered on traditional Kinnauri ceremonial caps, representing solar cycles.",
+            "metadata": '{"embroidery_type": "chain-stitch", "completion_time_days": 30}',
+        },
+        {
+            "district_id": districts["Kangra"].id,
+            "asset_type": "Deity Festival",
+            "title": "Kullu Dussehra (Mountain Deity Pageant)",
+            "description": "Two-week festival where 200+ village deities travel ceremonial routes. Peak travel disruptions occur mid-October.",
+            "metadata": '{"month": "October", "deity_count": 200}',
+        },
+        # Shimla Heritage
+        {
+            "district_id": districts["Shimla"].id,
+            "asset_type": "Dham Recipe",
+            "title": "Shimla Mash & Dal (Mountain Protein Bowl)",
+            "description": "High-altitude protein dish combining lentils, horse beans, and local herbs. Traditional winter sustenance.",
+            "metadata": '{"altitude_optimized": true, "season": "winter"}',
+        },
+        # Lahaul & Spiti Heritage
+        {
+            "district_id": districts["Lahaul & Spiti"].id,
+            "asset_type": "Dham Recipe",
+            "title": "Spiti Barley Bread & Butter Tea",
+            "description": "High-altitude staple combining barley bread with Himalayan salt butter tea. Essential for extreme weather survival.",
+            "metadata": '{"altitude": "3500m+", "season": "year-round"}',
+        },
+        {
+            "district_id": districts["Lahaul & Spiti"].id,
+            "asset_type": "Deity Festival",
+            "title": "Spiti Monastery Losar (Tibetan New Year)",
+            "description": "High-altitude monastery festival in sub-zero temperatures. Highway closures last 3-4 weeks during celebrations.",
+            "metadata": '{"month": "February", "altitude": "3600m"}',
+        },
+    ]
+
+    for asset_data in assets:
+        asset = CulturalAsset(
+            district_id=asset_data["district_id"],
+            asset_type=asset_data["asset_type"],
+            title=asset_data["title"],
+            description=asset_data["description"],
+            metadata=asset_data.get("metadata"),
+        )
+        db.add(asset)
 
 def find_assignment_officer(db: Session, department_id: int, district_id: Optional[int], block: str) -> Optional[Officer]:
     location_specific = db.query(Officer).filter(
@@ -835,46 +943,91 @@ def resolve_grievance(
         log_id=log.id,
     )
 
-@app.post("/api/grievances/{ticket_id}/reopen", response_model=GrievanceReopenResponse)
-def reopen_grievance(ticket_id: str, payload: GrievanceReopenRequest, db: Session = Depends(get_db)) -> GrievanceReopenResponse:
-    remarks = require_non_empty(payload.remarks, "remarks")
+@app.post("/api/grievances/{ticket_id}/veto", response_model=CitizenVetoResponse)
+def file_citizen_veto(
+    ticket_id: str,
+    payload: CitizenVetoRequest,
+    db: Session = Depends(get_db),
+) -> CitizenVetoResponse:
+    """Allow citizens to veto a resolved ticket with fresh ground evidence."""
+    veto_remarks = require_non_empty(payload.veto_remarks, "veto_remarks")
+    
     grievance = db.query(Grievance).filter(Grievance.ticket_id == ticket_id).with_for_update().first()
     if grievance is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket signature mismatch.")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grievance ticket not found.")
 
-    previous_status = enum_value(grievance.status)
+    if enum_value(grievance.status) != "Verified Resolved":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Citizen veto can only be filed on resolved tickets.",
+        )
+
+    # Get or create default citizen for veto
+    citizen = db.query(Citizen).filter(Citizen.phone == "9999999999").first()
+    
+    previous_status = "Verified Resolved"
     now = utc_now()
-    grievance.status = "Reopened"
+    grievance.status = "Reopened via Citizen Veto"
     grievance.reopened_count = int(grievance.reopened_count or 0) + 1
     grievance.is_escalated_to_supervisor = True
     grievance.sla_due_date = now + timedelta(hours=24)
 
+    veto_record = CitizenVeto(
+        grievance_id=grievance.id,
+        citizen_id=citizen.id if citizen else None,
+        veto_remarks=veto_remarks,
+        evidence_photo_url=payload.evidence_photo_url,
+    )
+
     log = GrievanceLog(
         grievance_id=grievance.id,
         previous_status=previous_status,
-        new_status="Reopened",
-        remarks=remarks,
-        action_by_officer_id=grievance.assigned_officer_id,
+        new_status="Reopened via Citizen Veto",
+        remarks=f"Citizen veto filed: {veto_remarks}",
+        action_by_officer_id=None,
     )
 
     try:
+        db.add(veto_record)
         db.add(log)
         db.commit()
-        db.refresh(log)
         db.refresh(grievance)
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to stage veto update.") from exc
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to file citizen veto.",
+        ) from exc
 
-    return GrievanceReopenResponse(
+    return CitizenVetoResponse(
         ticket_id=grievance.ticket_id,
         previous_status=previous_status,
         new_status=enum_value(grievance.status),
-        reopened_count=grievance.reopened_count,
-        is_escalated_to_supervisor=grievance.is_escalated_to_supervisor,
-        sla_due_date=grievance.sla_due_date,
-        log_id=log.id,
+        veto_id=veto_record.id,
     )
+
+@app.get("/api/cultural-assets", response_model=List[CulturalAssetResponse])
+def list_cultural_assets(district: Optional[str] = None, db: Session = Depends(get_db)) -> List[CulturalAssetResponse]:
+    """Fetch heritage content to fuel daily user engagement."""
+    query = db.query(CulturalAsset)
+    
+    if district:
+        query = query.join(District).filter(District.name == district)
+    
+    assets = query.order_by(CulturalAsset.created_at.desc()).all()
+    
+    return [
+        CulturalAssetResponse(
+            id=asset.id,
+            district=asset.district.name if asset.district else "Unknown",
+            asset_type=enum_value(asset.asset_type),
+            title=asset.title,
+            description=asset.description,
+            image_url=asset.image_url,
+            metadata=asset.metadata,
+        )
+        for asset in assets
+    ]
 
 @app.get("/api/admin/executive-alerts")
 def executive_alerts(db: Session = Depends(get_db)) -> Dict[str, Any]:
