@@ -1,3 +1,5 @@
+version: "3.9"
+
 services:
   db:
     image: postgres:16-alpine
@@ -15,6 +17,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 10s
+    networks:
+      - himachal_network
+    ports:
+      - "5432:5432"
 
   backend:
     build:
@@ -37,6 +43,10 @@ services:
       timeout: 5s
       retries: 5
       start_period: 30s
+    networks:
+      - himachal_network
+    volumes:
+      - ./backend:/app/backend
 
   frontend:
     build:
@@ -49,6 +59,23 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1:5173"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    networks:
+      - himachal_network
+    environment:
+      VITE_API_BASE_URL: "http://backend:8000"
+    volumes:
+      - ./frontend:/app/frontend
+
+networks:
+  himachal_network:
+    driver: bridge
 
 volumes:
   himachal_postgres_data:
+    driver: local
