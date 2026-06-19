@@ -12,23 +12,23 @@ import {
 import {
   Activity,
   AlertTriangle,
+  ArrowBigUp,
   ArrowRight,
   BadgeCheck,
   Bell,
   Building2,
   CheckCircle2,
   ChevronRight,
-  CircleDot,
   Clock3,
+  CloudLightning,
   Command,
   FileText,
   Gauge,
   ImagePlus,
   Loader2,
-  LockKeyhole,
   Radio,
   RefreshCcw,
-  SendHorizonal,
+  Send,
   ShieldAlert,
   Siren,
   TimerReset,
@@ -37,218 +37,244 @@ import {
   XCircle,
 } from "lucide-react";
 
+import himachalCrest from "./assets/himachal-crest.png";
 
-import delhiLogo from "./assets/delhi.png";
-
-const API_BASE_URL = (
-  import.meta.env?.VITE_API_BASE_URL || "http://localhost:8000"
-).replace(/\/$/, "");
-
-const ACTIVE_VIEW_STORAGE_KEY = "delhi-dashboard-active-view";
+const ACTIVE_VIEW_STORAGE_KEY = "hp-municipal-active-view";
+const UPVOTE_CRITICAL_THRESHOLD = 30;
+const FLASH_FLOOD_RISK = "Flash Flood Khud Proximity";
+const CLOCK_INTERVAL_MS = 60_000;
+const APP_CLOCK_STARTED_AT_MS = new Date().getTime();
 
 const views = [
   {
     id: "citizen",
-    label: "Citizen Portal",
-    eyebrow: "Ingress",
+    label: "Citizen Ingress Portal",
+    eyebrow: "Community Intake",
     icon: UserRound,
   },
   {
     id: "officer",
     label: "Field Officer Workspace",
-    eyebrow: "Resolution",
+    eyebrow: "Terrain Queue",
     icon: BadgeCheck,
   },
   {
     id: "executive",
     label: "CM Office Executive Hub",
-    eyebrow: "Oversight",
+    eyebrow: "Telemetry",
     icon: Command,
   },
 ];
 
-const districts = [
-  { id: 1, name: "New Delhi" },
-  { id: 2, name: "North Delhi" },
-  { id: 3, name: "South Delhi" },
-  { id: 4, name: "East Delhi" },
-  { id: 5, name: "West Delhi" },
+const hpLocationMatrix = [
+  {
+    district: "Kullu",
+    blocks: [
+      { block: "Anni", panchayats: ["Draman", "Kungash", "Lajheri"] },
+      { block: "Bhuntar", panchayats: ["Bari", "Sainj", "Jari"] },
+      { block: "Nirmand", panchayats: ["Arsu", "Deem", "Bagi Sarahan"] },
+    ],
+  },
+  {
+    district: "Mandi",
+    blocks: [
+      { block: "Seraj", panchayats: ["Bali Chowki", "Thunag", "Janjehli"] },
+      { block: "Drang", panchayats: ["Katindhi", "Pali", "Uhal"] },
+      { block: "Balh", panchayats: ["Kummi", "Gagal", "Ratti"] },
+    ],
+  },
+  {
+    district: "Shimla",
+    blocks: [
+      { block: "Rohru", panchayats: ["Chirgaon", "Samoli", "Pujarli"] },
+      { block: "Mashobra", panchayats: ["Baldeyan", "Bhont", "Dhalli"] },
+      { block: "Theog", panchayats: ["Matiana", "Kiari", "Deha"] },
+    ],
+  },
+  {
+    district: "Kangra",
+    blocks: [
+      { block: "Baijnath", panchayats: ["Paprola", "Bir", "Kothi Kohar"] },
+      { block: "Dharamshala", panchayats: ["Rakkar", "Tang Narwana", "Sidhpur"] },
+      { block: "Nurpur", panchayats: ["Rehan", "Sadwan", "Bassa Waziran"] },
+    ],
+  },
+  {
+    district: "Lahaul & Spiti",
+    blocks: [
+      { block: "Keylong", panchayats: ["Sissu", "Gondhla", "Jispa"] },
+      { block: "Kaza", panchayats: ["Kibber", "Langza", "Tabo"] },
+      { block: "Udaipur", panchayats: ["Triloknath", "Miyar", "Tindi"] },
+    ],
+  },
 ];
 
-const wards = [
-  { id: 1, districtId: 2, name: "Rohini Ward 11" },
-  { id: 2, districtId: 2, name: "Rohini Ward 12" },
-  { id: 3, districtId: 3, name: "Saket Ward 45" },
+const terrainRisks = [
+  "Landslide Vulnerable Link",
+  "Flash Flood Khud Proximity",
+  "High-Alpine Alpine Track",
+  "Standard Rural Road",
 ];
 
-const subcategories = [
-  { id: 1, name: "Major Pothole / Road Collapse", department: "PWD" },
-  { id: 2, name: "Water Contamination / Supply Outage", department: "DJB" },
-  { id: 3, name: "Streetlight Malfunction", department: "PWD" },
+const infrastructureTypes = [
+  "Connecting Bailey Bridge",
+  "Drinking Water Line",
+  "NH Highway Link",
+  "Power Grid Substation",
 ];
 
-const priorityRank = {
-  Critical: 4,
-  High: 3,
-  Medium: 2,
-  Low: 1,
+const infrastructureDepartment = {
+  "Connecting Bailey Bridge": "Public Works Department",
+  "Drinking Water Line": "Jal Shakti Vibhag",
+  "NH Highway Link": "National Highways Wing",
+  "Power Grid Substation": "HPSEBL Operations",
 };
 
 const priorityTone = {
-  Critical: "border-rose-200/50 bg-rose-100/60 text-rose-900",
-  High: "border-amber-200/50 bg-amber-100/50 text-amber-900",
-  Medium: "border-sky-200/50 bg-sky-100/50 text-sky-900",
-  Low: "border-emerald-200/50 bg-emerald-100/50 text-emerald-900",
+  critical: "border-rose-200/50 bg-rose-100/60 text-rose-900",
+  high: "border-amber-200/50 bg-amber-100/60 text-amber-900",
+  medium: "border-sky-200/50 bg-sky-100/50 text-sky-900",
+  low: "border-emerald-200/50 bg-emerald-100/50 text-emerald-900",
 };
 
-const cx = (...classes) => classes.filter(Boolean).join(" ");
+const statusTone = {
+  Pending: "border-amber-200/50 bg-amber-100/60 text-amber-900",
+  "Under Verification": "border-sky-200/50 bg-sky-100/50 text-sky-900",
+  "Verified Resolved": "border-emerald-200/50 bg-emerald-100/50 text-emerald-900",
+};
+
+const priorityLabel = {
+  critical: "Critical",
+  high: "High",
+  medium: "Medium",
+  low: "Low",
+};
 
 const inputClass =
   "w-full rounded-lg border border-[#eae8e0] bg-white px-3 py-2 text-sm " +
   "text-zinc-900 outline-none transition placeholder:text-zinc-400 " +
   "focus:border-[#1a2332] focus:bg-white focus:ring-4 focus:ring-[#1a2332]/5";
 
-async function apiRequest(path, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...options,
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
+const cx = (...classes) => classes.filter(Boolean).join(" ");
 
-  const contentType = response.headers.get("content-type") || "";
-  const payload = contentType.includes("application/json")
-    ? await response.json()
-    : await response.text();
+const initialGrievances = [
+  createSeedGrievance({
+    id: "HP-MON-2401",
+    title: "Bailey bridge deck plates buckling near Sainj market",
+    description:
+      "Community crossing over the khud is vibrating under school bus traffic after overnight rainfall.",
+    district: "Kullu",
+    block: "Bhuntar",
+    panchayat: "Sainj",
+    upvotes: 42,
+    terrainRisk: "Flash Flood Khud Proximity",
+    infrastructureType: "Connecting Bailey Bridge",
+    priority: "critical",
+    status: "Pending",
+    hoursAgo: 3,
+    slaHours: 6,
+  }),
+  createSeedGrievance({
+    id: "HP-MON-2402",
+    title: "Road retaining wall slipping on Seraj orchard link",
+    description:
+      "The lower shoulder has opened a visible crack and loose stone is falling onto the bus route.",
+    district: "Mandi",
+    block: "Seraj",
+    panchayat: "Thunag",
+    upvotes: 29,
+    terrainRisk: "Landslide Vulnerable Link",
+    infrastructureType: "NH Highway Link",
+    priority: "high",
+    status: "Under Verification",
+    hoursAgo: 14,
+    slaHours: 24,
+  }),
+  createSeedGrievance({
+    id: "HP-MON-2403",
+    title: "Gravity water line washed out above Draman",
+    description:
+      "Two hamlets are reporting no drinking water after the exposed pipe snapped at the nala crossing.",
+    district: "Kullu",
+    block: "Anni",
+    panchayat: "Draman",
+    upvotes: 18,
+    terrainRisk: "Flash Flood Khud Proximity",
+    infrastructureType: "Drinking Water Line",
+    priority: "high",
+    status: "Pending",
+    hoursAgo: 8,
+    slaHours: 18,
+  }),
+  createSeedGrievance({
+    id: "HP-MON-2404",
+    title: "Snowmelt erosion along Kibber service track",
+    description:
+      "High-altitude track shoulders are narrowing and emergency vehicle access is now unreliable.",
+    district: "Lahaul & Spiti",
+    block: "Kaza",
+    panchayat: "Kibber",
+    upvotes: 12,
+    terrainRisk: "High-Alpine Alpine Track",
+    infrastructureType: "Power Grid Substation",
+    priority: "high",
+    status: "Pending",
+    hoursAgo: 22,
+    slaHours: 36,
+  }),
+  createSeedGrievance({
+    id: "HP-MON-2405",
+    title: "Shimla ridge feeder road drainage blocked",
+    description:
+      "Silted cross-drain is forcing runoff onto the carriageway and undercutting a retaining edge.",
+    district: "Shimla",
+    block: "Mashobra",
+    panchayat: "Baldeyan",
+    upvotes: 8,
+    terrainRisk: "Standard Rural Road",
+    infrastructureType: "NH Highway Link",
+    priority: "medium",
+    status: "Verified Resolved",
+    hoursAgo: 48,
+    slaHours: 72,
+    resolutionNotes:
+      "Cross-drain cleared, shoulder packed, and runoff redirected with temporary stone pitching.",
+    validationImageUrl: "https://images.example.org/hp/mashobra-drainage-clearance.jpg",
+  }),
+  createSeedGrievance({
+    id: "HP-MON-2406",
+    title: "Dharamshala substation approach waterlogged",
+    description:
+      "Approach road to the power switching yard is collecting runoff and equipment access is delayed.",
+    district: "Kangra",
+    block: "Dharamshala",
+    panchayat: "Rakkar",
+    upvotes: 35,
+    terrainRisk: "Landslide Vulnerable Link",
+    infrastructureType: "Power Grid Substation",
+    priority: "critical",
+    status: "Pending",
+    hoursAgo: 5,
+    slaHours: 12,
+  }),
+];
 
-  if (!response.ok) {
-    throw new Error(resolveApiError(payload));
-  }
-
-  return payload;
-}
-
-function resolveApiError(payload) {
-  if (!payload) {
-    return "Request failed. The API did not return a response body.";
-  }
-
-  if (typeof payload === "string") {
-    return payload;
-  }
-
-  if (Array.isArray(payload.detail)) {
-    return payload.detail
-      .map((item) => item.msg || item.detail || JSON.stringify(item))
-      .join(" ");
-  }
-
-  if (typeof payload.detail === "string") {
-    return payload.detail;
-  }
-
-  if (typeof payload.message === "string") {
-    return payload.message;
-  }
-
-  return "Request failed. Check the API logs for details.";
-}
-
-function formatDateTime(value) {
-  if (!value) {
-    return "Not set";
-  }
-
-  return new Intl.DateTimeFormat("en-IN", {
-    day: "2-digit",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  }).format(new Date(value));
-}
-
-function useCountdown(targetDate) {
-  const [now, setNow] = useState(() => Date.now());
-
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
-  }, []);
-
-  return useMemo(() => {
-    if (!targetDate) {
-      return {
-        expired: false,
-        text: "Awaiting SLA",
-        seconds: 0,
-        progress: 0,
-      };
-    }
-
-    const target = new Date(targetDate).getTime();
-    const remaining = Math.max(0, target - now);
-    const seconds = Math.floor(remaining / 1000);
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
-    const progress = Math.max(
-      5,
-      Math.min(100, (remaining / (72 * 60 * 60 * 1000)) * 100),
-    );
-
-    return {
-      expired: remaining === 0,
-      text: `${days}d ${hours}h ${minutes}m ${secs}s`,
-      seconds,
-      progress,
-    };
-  }, [now, targetDate]);
-}
-
-function getSlaMeta(value) {
-  const target = new Date(value).getTime();
-  const diffHours = (target - Date.now()) / (1000 * 60 * 60);
-
-  if (diffHours < 0) {
-    return {
-      label: "Breached",
-      tone: "border-amber-200/50 bg-amber-100/60 text-amber-900",
-      urgency: 100,
-    };
-  }
-
-  if (diffHours <= 6) {
-    return {
-      label: `${Math.ceil(diffHours)}h left`,
-      tone: "border-amber-200 bg-amber-50 text-amber-700",
-      urgency: 80,
-    };
-  }
+function createSeedGrievance({
+  hoursAgo,
+  slaHours,
+  resolutionNotes = "",
+  validationImageUrl = "",
+  ...ticket
+}) {
+  const createdAt = offsetDate(-hoursAgo);
 
   return {
-    label: formatDateTime(value),
-    tone: "border-[#eae8e0] bg-[#efeee8] text-zinc-700",
-    urgency: Math.max(5, 60 - diffHours),
-  };
-}
-
-function normalizeAlert(alert) {
-  if (typeof alert === "string") {
-    return {
-      type: "general",
-      severity: "medium",
-      message: alert,
-    };
-  }
-
-  return {
-    type: alert.type || "general",
-    severity: alert.severity || "medium",
-    message: alert.message || "Administrative signal detected.",
-    ...alert,
+    ...ticket,
+    department: infrastructureDepartment[ticket.infrastructureType],
+    createdAt,
+    slaDueAt: offsetDate(slaHours - hoursAgo),
+    resolutionNotes,
+    validationImageUrl,
   };
 }
 
@@ -261,6 +287,9 @@ function App() {
     const storedView = window.localStorage.getItem(ACTIVE_VIEW_STORAGE_KEY);
     return views.some((view) => view.id === storedView) ? storedView : "citizen";
   });
+  const [grievances, setGrievances] = useState(initialGrievances);
+  const [clockTicks, setClockTicks] = useState(0);
+  const nowMs = APP_CLOCK_STARTED_AT_MS + clockTicks * CLOCK_INTERVAL_MS;
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -268,24 +297,96 @@ function App() {
     }
   }, [activeView]);
 
+  useEffect(() => {
+    const interval = window.setInterval(() => {
+      setClockTicks((tick) => tick + 1);
+    }, CLOCK_INTERVAL_MS);
+
+    return () => window.clearInterval(interval);
+  }, []);
+
   const activeViewConfig = views.find((view) => view.id === activeView);
+
+  function handleCreateGrievance(form) {
+    const priority = derivePriorityFromTerrain(form.terrainRisk);
+    const now = new Date();
+    const ticket = {
+      id: `HP-MON-${now.getTime().toString(36).toUpperCase()}`,
+      title: form.title.trim(),
+      description: form.description.trim(),
+      district: form.district,
+      block: form.block,
+      panchayat: form.panchayat,
+      upvotes: 0,
+      terrainRisk: form.terrainRisk,
+      infrastructureType: form.infrastructureType,
+      department: infrastructureDepartment[form.infrastructureType],
+      priority,
+      status: "Pending",
+      createdAt: now.toISOString(),
+      slaDueAt: addHours(now, priorityToSlaHours(priority)).toISOString(),
+      intakePhotoUrl: form.intakePhotoUrl.trim(),
+      citizenName: form.citizenName.trim(),
+      resolutionNotes: "",
+      validationImageUrl: "",
+    };
+
+    setGrievances((current) => [ticket, ...current]);
+    return ticket;
+  }
+
+  function handleUpvote(ticketId) {
+    setGrievances((current) =>
+      current.map((ticket) => {
+        if (ticket.id !== ticketId) {
+          return ticket;
+        }
+
+        const upvotes = ticket.upvotes + 1;
+        return {
+          ...ticket,
+          upvotes,
+          priority:
+            upvotes > UPVOTE_CRITICAL_THRESHOLD ? "critical" : ticket.priority,
+        };
+      }),
+    );
+  }
+
+  function handleResolve(ticketId, resolutionNotes, validationImageUrl) {
+    setGrievances((current) =>
+      current.map((ticket) =>
+        ticket.id === ticketId
+          ? {
+              ...ticket,
+              status: "Verified Resolved",
+              resolvedAt: new Date().toISOString(),
+              resolutionNotes,
+              validationImageUrl,
+            }
+          : ticket,
+      ),
+    );
+  }
 
   return (
     <main className="min-h-screen bg-[#f4f3ef] text-zinc-900 selection:bg-[#eae8e0]/80">
+      <MonsoonAlertTicker />
+
       <div className="border-b border-[#eae8e0] bg-[#f9f9f7]/85 shadow-sm shadow-[#eae8e0]/60 backdrop-blur-xl">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-4 py-4 sm:px-6 lg:px-8">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
             <div className="flex min-w-0 items-center gap-3">
-              <div className="h-12 w-14 shrink-0 select-none transition-transform duration-200 hover:scale-105">
+              <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-xl border border-[#eae8e0] bg-white p-0.5 shadow-sm shadow-[#eae8e0]/60 transition-transform duration-200 hover:scale-105">
                 <img 
-                  src={delhiLogo} 
-                  alt="Delhi Accountability System Logo" 
-                  className="h-full w-full object-contain object-left"
+                  src={himachalCrest} 
+                  alt="Dev Bhoomi Governance Crest" 
+                  className="h-full w-full object-contain rounded-lg"
                   />
-                </div>
+              </div>
               <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-[0.18em] text-zinc-500">
-                  Delhi Accountability Monitoring System
+                  Himachal Pradesh Municipal Accountability & Monsoon Infrastructure
                 </p>
                 <h1 className="truncate text-lg font-semibold text-zinc-900">
                   {activeViewConfig?.label}
@@ -294,12 +395,12 @@ function App() {
             </div>
             <div className="flex flex-wrap items-center gap-2 text-xs text-zinc-500">
               <span className="inline-flex items-center gap-2 rounded-lg border border-[#eae8e0] bg-white px-3 py-1.5 text-xs font-semibold text-[#1a2332] shadow-sm shadow-[#eae8e0]/40">
-                <Radio className="h-3.5 w-3.5 text-emerald-600 animate-pulse" />
-                API: {API_BASE_URL}
+                <Radio className="h-3.5 w-3.5 animate-pulse text-emerald-600" />
+                District telemetry live
               </span>
               <span className="inline-flex items-center gap-2 rounded-lg border border-[#eae8e0] bg-[#f9f9f7]/80 px-3 py-2 shadow-sm shadow-[#eae8e0]/50">
                 <Activity className="h-3.5 w-3.5 text-sky-600" />
-                Live demo controls
+                Monsoon command state
               </span>
             </div>
           </div>
@@ -317,7 +418,7 @@ function App() {
                   className={cx(
                     "flex items-center justify-between rounded-md px-3 py-2.5 text-left transition",
                     isActive
-                      ? "scale-[1.01] bg-zinc-950 text-[#f9f9f7] shadow-md shadow-zinc-950/10"
+                      ? "scale-[1.01] bg-[#1a2332] text-[#f9f9f7] shadow-md shadow-[#1a2332]/10"
                       : "text-zinc-600 hover:bg-[#f9f9f7]/80 hover:text-zinc-900",
                   )}
                 >
@@ -352,173 +453,179 @@ function App() {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 py-7 sm:px-6 lg:px-8">
-        {activeView === "citizen" && <CitizenPortal />}
-        {activeView === "officer" && <FieldOfficerDesk />}
-        {activeView === "executive" && <ExecutiveHub />}
+        {activeView === "citizen" && (
+          <CitizenPortal
+            grievances={grievances}
+            onCreateGrievance={handleCreateGrievance}
+            onUpvote={handleUpvote}
+          />
+        )}
+        {activeView === "officer" && (
+          <FieldOfficerWorkspace
+            grievances={grievances}
+            nowMs={nowMs}
+            onResolve={handleResolve}
+          />
+        )}
+        {activeView === "executive" && (
+          <ExecutiveHub grievances={grievances} nowMs={nowMs} />
+        )}
       </div>
     </main>
   );
 }
 
-function CitizenPortal() {
-  const [form, setForm] = useState({
-    citizen_id: "1",
-    district_id: "2",
-    ward_id: "1",
-    subcategory_id: "1",
-    latitude: "28.613900",
-    longitude: "77.209000",
-    title: "Road surface failure near school gate",
-    description:
-      "Large pothole and loose debris are blocking the left lane during peak hours.",
-    intake_photo_url: "",
-  });
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-  const [result, setResult] = useState(null);
-  const [reopenForm, setReopenForm] = useState({
-    ticket_id: "",
-    remarks: "Issue remains unresolved at the reported location.",
-  });
-  const [reopenLoading, setReopenLoading] = useState(false);
-  const [reopenError, setReopenError] = useState("");
-  const [reopenResult, setReopenResult] = useState(null);
-  const countdown = useCountdown(result?.sla_due_date);
+function MonsoonAlertTicker() {
+  const bulletins = [
+    "IMD ORANGE ALERT: Heavy rainfall expected in Mandi & Kullu districts. Flash flood risk high over next 48 hours. Landslide warnings active on NH-3.",
+    "Kangra hill slopes under watch: waterlogged feeder roads and substation access corridors require immediate inspection.",
+    "Lahaul & Spiti high-alpine tracks reporting rapid snowmelt runoff. Bailey bridge and drinking water line crews remain on standby.",
+  ];
 
-  const districtWardOptions = wards.filter(
-    (ward) => ward.districtId === Number(form.district_id),
+  return (
+    <section className="border-b border-rose-200/50 bg-rose-100/30 text-rose-950">
+      <div className="mx-auto flex max-w-7xl items-center gap-3 overflow-hidden px-4 py-2 sm:px-6 lg:px-8">
+        <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-rose-200/60 bg-[#f9f9f7] text-rose-950">
+          <CloudLightning className="h-4 w-4" aria-hidden="true" />
+        </div>
+        <div className="min-w-0 flex-1 overflow-hidden">
+          <div className="ticker-track flex gap-10 whitespace-nowrap text-xs font-bold uppercase tracking-[0.16em]">
+            {[...bulletins, ...bulletins].map((bulletin, index) => (
+              <span className="inline-flex items-center gap-3" key={`${bulletin}-${index}`}>
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-rose-950" />
+                {bulletin}
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
+}
+
+function CitizenPortal({ grievances, onCreateGrievance, onUpvote }) {
+  const [form, setForm] = useState(() => {
+    const firstDistrict = hpLocationMatrix[0];
+    const firstBlock = firstDistrict.blocks[0];
+
+    return {
+      citizenName: "Rina Thakur",
+      district: firstDistrict.district,
+      block: firstBlock.block,
+      panchayat: firstBlock.panchayats[0],
+      infrastructureType: "Connecting Bailey Bridge",
+      terrainRisk: "Flash Flood Khud Proximity",
+      title: "Approach slab cracking after overnight rainfall",
+      description:
+        "The bridge approach has opened a fresh crack and two-wheelers are skidding near the khud edge.",
+      intakePhotoUrl: "",
+    };
+  });
+  const [error, setError] = useState("");
+  const [latestTicket, setLatestTicket] = useState(null);
+
+  const selectedDistrict = hpLocationMatrix.find(
+    (entry) => entry.district === form.district,
+  );
+  const blockOptions = selectedDistrict?.blocks || [];
+  const selectedBlock = blockOptions.find((entry) => entry.block === form.block);
+  const panchayatOptions = selectedBlock?.panchayats || [];
+
+  const feed = useMemo(
+    () =>
+      [...grievances].sort((left, right) => {
+        const upvoteDelta = right.upvotes - left.upvotes;
+        if (upvoteDelta !== 0) {
+          return upvoteDelta;
+        }
+        return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      }),
+    [grievances],
+  );
+
+  const latestFromState = latestTicket
+    ? grievances.find((ticket) => ticket.id === latestTicket.id) || latestTicket
+    : null;
 
   function updateForm(field, value) {
     setForm((current) => {
       const next = { ...current, [field]: value };
 
-      if (field === "district_id") {
-        const firstWard = wards.find((ward) => ward.districtId === Number(value));
-        next.ward_id = String(firstWard?.id || "");
+      if (field === "district") {
+        const district = hpLocationMatrix.find((entry) => entry.district === value);
+        const firstBlock = district?.blocks[0];
+        next.block = firstBlock?.block || "";
+        next.panchayat = firstBlock?.panchayats[0] || "";
+      }
+
+      if (field === "block") {
+        const block = blockOptions.find((entry) => entry.block === value);
+        next.panchayat = block?.panchayats[0] || "";
       }
 
       return next;
     });
   }
 
-  async function submitIntake(event) {
+  function submitIntake(event) {
     event.preventDefault();
-    setLoading(true);
     setError("");
-    setResult(null);
 
-    try {
-      const payload = {
-        citizen_id: Number(form.citizen_id),
-        subcategory_id: Number(form.subcategory_id),
-        latitude: Number(form.latitude),
-        longitude: Number(form.longitude),
-        district_id: Number(form.district_id),
-        ward_id: Number(form.ward_id),
-        title: form.title.trim(),
-        description: form.description.trim(),
-        intake_photo_url: form.intake_photo_url.trim() || undefined,
-      };
-      const data = await apiRequest("/api/v1/grievances/intake", {
-        method: "POST",
-        body: JSON.stringify(payload),
-      });
-
-      setResult(data);
-      const syncPayload = {
-        ticket_id: data.ticket_id,
-        title: form.title.trim(),
-        priority: data.priority,
-        sla_due_date: data.sla_due_date,
-      };
-      window.localStorage.setItem(
-        "delhi_latest_ticket",
-        JSON.stringify(syncPayload),
-      );
-      setReopenForm((current) => ({
-        ...current,
-        ticket_id: data.ticket_id || current.ticket_id,
-      }));
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setLoading(false);
+    if (!form.title.trim() || !form.description.trim()) {
+      setError("Title and description are required for intake registration.");
+      return;
     }
-  }
 
-  async function submitReopen(event) {
-    event.preventDefault();
-    setReopenLoading(true);
-    setReopenError("");
-    setReopenResult(null);
-
-    try {
-      const data = await apiRequest(
-        `/api/v1/grievances/${encodeURIComponent(reopenForm.ticket_id)}/reopen`,
-        {
-          method: "POST",
-          body: JSON.stringify({ remarks: reopenForm.remarks.trim() }),
-        },
-      );
-      setReopenResult(data);
-    } catch (requestError) {
-      setReopenError(requestError.message);
-    } finally {
-      setReopenLoading(false);
-    }
+    const ticket = onCreateGrievance(form);
+    setLatestTicket(ticket);
+    setForm((current) => ({
+      ...current,
+      title: "",
+      description: "",
+      intakePhotoUrl: "",
+    }));
   }
 
   return (
-    <div className="grid gap-5 lg:grid-cols-[1.35fr_0.85fr]">
+    <div className="grid gap-5 lg:grid-cols-[1.05fr_0.95fr]">
       <section className="rounded-lg border border-[#eae8e0] bg-[#f9f9f7] p-5 shadow-sm shadow-[#eae8e0]/50">
-        <div className="mb-5 flex items-start justify-between gap-4">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
-              Citizen Ingress
-            </p>
-            <h2 className="mt-1 text-xl font-semibold text-zinc-900">
-              New grievance intake
-            </h2>
-          </div>
-          <div className="rounded-lg border border-[#1a2332]/10 bg-[#1a2332]/5 p-2 text-[#1a2332]">
-            <SendHorizonal className="h-5 w-5" aria-hidden="true" />
-          </div>
-        </div>
+        <PanelHeader
+          eyebrow="Citizen Ingress"
+          icon={Send}
+          title="Mountain infrastructure complaint intake"
+        />
 
-        <form className="grid gap-4" onSubmit={submitIntake}>
+        <form className="mt-5 grid gap-4" onSubmit={submitIntake}>
           <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Citizen ID">
+            <Field label="Citizen Name">
               <input
                 className={inputClass}
-                min="1"
-                type="number"
-                value={form.citizen_id}
-                onChange={(event) => updateForm("citizen_id", event.target.value)}
+                value={form.citizenName}
+                onChange={(event) => updateForm("citizenName", event.target.value)}
               />
             </Field>
             <Field label="District">
               <select
                 className={inputClass}
-                value={form.district_id}
-                onChange={(event) => updateForm("district_id", event.target.value)}
+                value={form.district}
+                onChange={(event) => updateForm("district", event.target.value)}
               >
-                {districts.map((district) => (
-                  <option key={district.id} value={district.id}>
-                    {district.name}
+                {hpLocationMatrix.map((entry) => (
+                  <option key={entry.district} value={entry.district}>
+                    {entry.district}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Ward">
+            <Field label="Block">
               <select
                 className={inputClass}
-                value={form.ward_id}
-                onChange={(event) => updateForm("ward_id", event.target.value)}
+                value={form.block}
+                onChange={(event) => updateForm("block", event.target.value)}
               >
-                {districtWardOptions.map((ward) => (
-                  <option key={ward.id} value={ward.id}>
-                    {ward.name}
+                {blockOptions.map((entry) => (
+                  <option key={entry.block} value={entry.block}>
+                    {entry.block}
                   </option>
                 ))}
               </select>
@@ -526,38 +633,46 @@ function CitizenPortal() {
           </div>
 
           <div className="grid gap-3 md:grid-cols-3">
-            <Field label="Subcategory">
+            <Field label="Gram Panchayat">
               <select
                 className={inputClass}
-                value={form.subcategory_id}
-                onChange={(event) =>
-                  updateForm("subcategory_id", event.target.value)
-                }
+                value={form.panchayat}
+                onChange={(event) => updateForm("panchayat", event.target.value)}
               >
-                {subcategories.map((subcategory) => (
-                  <option key={subcategory.id} value={subcategory.id}>
-                    {subcategory.name} - {subcategory.department}
+                {panchayatOptions.map((panchayat) => (
+                  <option key={panchayat} value={panchayat}>
+                    {panchayat}
                   </option>
                 ))}
               </select>
             </Field>
-            <Field label="Latitude">
-              <input
+            <Field label="Infrastructure Type">
+              <select
                 className={inputClass}
-                step="0.000001"
-                type="number"
-                value={form.latitude}
-                onChange={(event) => updateForm("latitude", event.target.value)}
-              />
+                value={form.infrastructureType}
+                onChange={(event) =>
+                  updateForm("infrastructureType", event.target.value)
+                }
+              >
+                {infrastructureTypes.map((type) => (
+                  <option key={type} value={type}>
+                    {type}
+                  </option>
+                ))}
+              </select>
             </Field>
-            <Field label="Longitude">
-              <input
+            <Field label="Terrain Risk">
+              <select
                 className={inputClass}
-                step="0.000001"
-                type="number"
-                value={form.longitude}
-                onChange={(event) => updateForm("longitude", event.target.value)}
-              />
+                value={form.terrainRisk}
+                onChange={(event) => updateForm("terrainRisk", event.target.value)}
+              >
+                {terrainRisks.map((risk) => (
+                  <option key={risk} value={risk}>
+                    {risk}
+                  </option>
+                ))}
+              </select>
             </Field>
           </div>
 
@@ -582,26 +697,18 @@ function CitizenPortal() {
             <input
               className={inputClass}
               placeholder="https://..."
-              value={form.intake_photo_url}
-              onChange={(event) =>
-                updateForm("intake_photo_url", event.target.value)
-              }
+              value={form.intakePhotoUrl}
+              onChange={(event) => updateForm("intakePhotoUrl", event.target.value)}
             />
           </Field>
 
           {error && <InlineError message={error} />}
 
           <button
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1a2332] px-4 text-sm font-bold text-[#f9f9f7] shadow-md shadow-[#1a2332]/10 transition-all duration-200 hover:bg-[#233044] disabled:cursor-not-allowed disabled:bg-zinc-200"
-            disabled={loading}
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-lg bg-[#1a2332] px-4 text-sm font-bold text-[#f9f9f7] shadow-md shadow-[#1a2332]/10 transition-all duration-200 hover:bg-[#233044]"
             type="submit"
-            >
-            
-            {loading ? (
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <SendHorizonal className="h-4 w-4" aria-hidden="true" />
-            )}
+          >
+            <Send className="h-4 w-4" aria-hidden="true" />
             Submit grievance
           </button>
         </form>
@@ -609,300 +716,186 @@ function CitizenPortal() {
 
       <div className="grid gap-5">
         <section className="rounded-lg border border-[#eae8e0] bg-[#f9f9f7] p-5 shadow-sm shadow-[#eae8e0]/50">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
-                Intake Result
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-zinc-900">
-                Live ticket state
-              </h2>
-            </div>
-            <TimerReset className="h-5 w-5 text-zinc-500" aria-hidden="true" />
-          </div>
+          <PanelHeader
+            eyebrow="Intake Result"
+            icon={TimerReset}
+            title="Live ticket state"
+          />
 
-          {result ? (
-            <div className="mt-5 space-y-4">
-              <div className="rounded-lg border border-emerald-100/80 bg-emerald-50/50 p-4">
-                <div className="flex items-start gap-3">
-                  <CheckCircle2
-                    className="mt-0.5 h-5 w-5 text-emerald-700"
-                    aria-hidden="true"
-                  />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-emerald-900">
-                      Ticket registered
-                    </p>
-                    <p className="mt-1 break-all font-mono text-sm text-emerald-800">
-                      {result.ticket_id}
-                    </p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <MetricPill label="Status" value={result.status} />
-                <MetricPill label="Priority" value={result.priority} />
-              </div>
-
-              <div className="rounded-lg border border-[#eae8e0] bg-[#efeee8] p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <span className="text-sm font-medium text-zinc-600">
-                    SLA countdown
-                  </span>
-                  <Clock3 className="h-4 w-4 text-zinc-500" aria-hidden="true" />
-                </div>
-                <p className="mt-3 font-mono text-2xl font-semibold text-zinc-900">
-                  {countdown.expired ? "Breached" : countdown.text}
-                </p>
-                <div className="mt-3 h-2 rounded-full bg-[#eae8e0]">
-                  <div
-                    className={cx(
-                      "h-2 rounded-full transition-all duration-500",
-                      countdown.expired ? "bg-rose-500" : "bg-emerald-500",
-                    )}
-                    style={{ width: `${countdown.progress}%` }}
-                  />
-                </div>
-                <p className="mt-2 text-xs text-zinc-500">
-                  Due {formatDateTime(result.sla_due_date)}
-                </p>
-              </div>
+          {latestFromState ? (
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <MetricPill label="Ticket ID" value={latestFromState.id} />
+              <MetricPill
+                label="Priority"
+                value={priorityLabel[getEffectivePriority(latestFromState)]}
+              />
+              <MetricPill label="Upvotes" value={latestFromState.upvotes} />
+              <MetricPill
+                label="SLA Target"
+                value={formatDateTime(latestFromState.slaDueAt)}
+              />
             </div>
           ) : (
             <EmptyState
+              detail="Registered complaints appear here immediately."
               icon={FileText}
-              title="No ticket submitted"
-              detail="The registered ticket will appear here."
+              title="No new local ticket"
             />
           )}
         </section>
 
         <section className="rounded-lg border border-[#eae8e0] bg-[#f9f9f7] p-5 shadow-sm shadow-[#eae8e0]/50">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
-                Track & Intervene
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-zinc-900">
-                Citizen veto route
-              </h2>
-            </div>
-            <ShieldAlert className="h-5 w-5 text-rose-600" aria-hidden="true" />
+          <PanelHeader
+            eyebrow="Community Signal"
+            icon={ArrowBigUp}
+            title="Local grievance feed"
+          />
+
+          <div className="mt-5 grid gap-3">
+            {feed.map((ticket) => (
+              <GrievanceFeedCard
+                key={ticket.id}
+                onUpvote={onUpvote}
+                ticket={ticket}
+              />
+            ))}
           </div>
-
-          <form className="grid gap-3" onSubmit={submitReopen}>
-            <Field label="Resolved Ticket ID">
-              <input
-                className={cx(inputClass, "font-mono")}
-                value={reopenForm.ticket_id}
-                onChange={(event) =>
-                  setReopenForm((current) => ({
-                    ...current,
-                    ticket_id: event.target.value,
-                  }))
-                }
-              />
-            </Field>
-            <Field label="Remarks">
-              <textarea
-                className={cx(inputClass, "min-h-24 resize-none")}
-                value={reopenForm.remarks}
-                onChange={(event) =>
-                  setReopenForm((current) => ({
-                    ...current,
-                    remarks: event.target.value,
-                  }))
-                }
-              />
-            </Field>
-
-            {reopenError && <InlineError message={reopenError} />}
-            {reopenResult && (
-              <InlineSuccess
-                message={`Reopened with SLA due ${formatDateTime(
-                  reopenResult.sla_due_date,
-                )}`}
-              />
-            )}
-
-            <button
-              className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#eae8e0] bg-[#efeee8] px-4 text-sm font-semibold text-rose-800 transition hover:bg-[#eae8e0]/70 disabled:cursor-not-allowed disabled:border-[#eae8e0] disabled:bg-[#efeee8]/70 disabled:text-zinc-400"
-              disabled={
-                reopenLoading
-                || !reopenForm.ticket_id.trim()
-                || !reopenForm.remarks.trim()
-              }
-              type="submit"
-            >
-              {reopenLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <RefreshCcw className="h-4 w-4" aria-hidden="true" />
-              )}
-              Reopen ticket
-            </button>
-          </form>
         </section>
       </div>
     </div>
   );
 }
 
-function FieldOfficerDesk() {
-  const [queue, setQueue] = useState([]);
-  const [loadingQueue, setLoadingQueue] = useState(false);
-  const [officerId, setOfficerId] = useState("1");
+function GrievanceFeedCard({ ticket, onUpvote }) {
+  const effectivePriority = getEffectivePriority(ticket);
+  const isCluster = ticket.upvotes > UPVOTE_CRITICAL_THRESHOLD;
+
+  return (
+    <article className="rounded-lg border border-[#eae8e0] bg-[#f9f9f7] p-4 shadow-sm shadow-[#eae8e0]/40">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className={priorityTone[effectivePriority]}>
+              {priorityLabel[effectivePriority]}
+            </Badge>
+            <Badge className={statusTone[ticket.status]}>{ticket.status}</Badge>
+            {isCluster && (
+              <Badge className="border-rose-200/50 bg-rose-100/60 text-rose-900">
+                High-Upvote Emergency
+              </Badge>
+            )}
+          </div>
+          <h3 className="mt-3 text-sm font-semibold text-zinc-950">
+            {ticket.title}
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-zinc-600">
+            {ticket.description}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2 text-xs text-zinc-600">
+            <span className="rounded-md border border-[#eae8e0] bg-[#efeee8] px-2 py-1">
+              {ticket.district} / {ticket.block} / {ticket.panchayat}
+            </span>
+            <span className="rounded-md border border-[#eae8e0] bg-[#efeee8] px-2 py-1">
+              {ticket.infrastructureType}
+            </span>
+            <span className="rounded-md border border-[#eae8e0] bg-[#efeee8] px-2 py-1">
+              {ticket.terrainRisk}
+            </span>
+          </div>
+        </div>
+        <button
+          className="inline-flex h-10 shrink-0 items-center justify-center gap-2 rounded-lg border border-[#1a2332]/15 bg-[#1a2332]/5 px-3 text-sm font-bold text-[#1a2332] transition hover:bg-[#1a2332] hover:text-[#f9f9f7]"
+          onClick={() => onUpvote(ticket.id)}
+          type="button"
+        >
+          <ArrowBigUp className="h-4 w-4" aria-hidden="true" />
+          <span className="rounded-md border border-current/20 px-2 py-0.5 tabular-nums">
+            {ticket.upvotes}
+          </span>
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function FieldOfficerWorkspace({ grievances, nowMs, onResolve }) {
   const [selectedTicket, setSelectedTicket] = useState(null);
   const [resolutionNotes, setResolutionNotes] = useState("");
-  const [resolutionPhotoUrl, setResolutionPhotoUrl] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [validationImageUrl, setValidationImageUrl] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  useEffect(() => {
-    const controller = new AbortController();
-    const timerId = window.setTimeout(executeQueueSync, 0);
+  const queue = useMemo(
+    () =>
+      grievances.filter((ticket) => ticket.status !== "Verified Resolved"),
+    [grievances],
+  );
 
-    async function executeQueueSync() {
-      const normalizedOfficerId = officerId.trim();
-
-      if (!normalizedOfficerId) {
-        if (!controller.signal.aborted) {
-          setQueue([]);
-          setLoadingQueue(false);
+  const sortedQueue = useMemo(
+    () =>
+      [...queue].sort((left, right) => {
+        const scoreDelta =
+          calculateCompositeScore(right) - calculateCompositeScore(left);
+        if (scoreDelta !== 0) {
+          return scoreDelta;
         }
-        return;
-      }
 
-      setLoadingQueue(true);
-      setError("");
-
-      try {
-        const data = await apiRequest(
-          `/api/v1/officer/${encodeURIComponent(normalizedOfficerId)}/queue`,
-          { signal: controller.signal },
-        );
-
-        if (!controller.signal.aborted) {
-          setQueue(Array.isArray(data) ? data : []);
-        }
-      } catch (requestError) {
-        if (!controller.signal.aborted) {
-          setError(requestError.message);
-          setQueue([]);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoadingQueue(false);
-        }
-      }
-    }
-
-    return () => {
-      controller.abort();
-      window.clearTimeout(timerId);
-    };
-  }, [officerId, success]);
-
-  const sortedQueue = useMemo(() => {
-    return [...queue].sort((left, right) => {
-      const leftSla = new Date(left.sla_due_date).getTime();
-      const rightSla = new Date(right.sla_due_date).getTime();
-      const priorityDelta =
-        priorityRank[right.priority] - priorityRank[left.priority];
-
-      if (priorityDelta !== 0) {
-        return priorityDelta;
-      }
-
-      return leftSla - rightSla;
-    });
-  }, [queue]);
-
+        return new Date(left.slaDueAt).getTime() - new Date(right.slaDueAt).getTime();
+      }),
+    [queue],
+  );
 
   function openResolution(ticket) {
     setSelectedTicket(ticket);
     setResolutionNotes("");
-    setResolutionPhotoUrl("");
+    setValidationImageUrl("");
     setError("");
     setSuccess("");
   }
 
   function closeResolution() {
-    if (!loading) {
-      setSelectedTicket(null);
-      setError("");
-    }
+    setSelectedTicket(null);
+    setResolutionNotes("");
+    setValidationImageUrl("");
+    setError("");
   }
 
-  async function submitResolution(event) {
+  function submitResolution(event) {
     event.preventDefault();
 
     if (!selectedTicket) {
       return;
     }
 
-    setLoading(true);
-    setError("");
-    setSuccess("");
-
-    try {
-      const data = await apiRequest(
-        `/api/v1/grievances/${encodeURIComponent(
-          selectedTicket.ticket_id,
-        )}/resolve`,
-        {
-          method: "POST",
-          body: JSON.stringify({
-            officer_id: Number(officerId),
-            resolution_notes: resolutionNotes.trim(),
-            resolution_photo_url: resolutionPhotoUrl.trim(),
-          }),
-        },
-      );
-
-      setQueue((current) =>
-        current.filter((ticket) => ticket.ticket_id !== selectedTicket.ticket_id),
-      );
-      setSuccess(
-        `Ticket ${data.ticket_id} moved to ${data.new_status} successfully.`,
-      );
-      setSelectedTicket(null);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setLoading(false);
+    if (!resolutionNotes.trim() || !validationImageUrl.trim()) {
+      setError("Resolution Notes and Validation Image URL are mandatory.");
+      return;
     }
+
+    onResolve(
+      selectedTicket.id,
+      resolutionNotes.trim(),
+      validationImageUrl.trim(),
+    );
+    setSuccess(`${selectedTicket.id} verified and closed with evidence.`);
+    closeResolution();
   }
 
   return (
     <div className="grid gap-5">
       <section className="rounded-lg border border-[#eae8e0] bg-[#f9f9f7] p-5 shadow-sm shadow-[#eae8e0]/50">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
-              Field Operations
-            </p>
-            <h2 className="mt-1 text-xl font-semibold text-zinc-900">
-              Evidence-enforced work queue
-            </h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <label className="flex items-center gap-2 rounded-lg border border-[#eae8e0] bg-[#efeee8] px-3 py-2 text-sm text-zinc-600">
-              <LockKeyhole className="h-4 w-4 text-zinc-500" />
-              Officer ID
-              <input
-                className="h-7 w-20 rounded-md border border-[#eae8e0] bg-[#f9f9f7] px-2 text-sm font-semibold text-zinc-900 outline-none focus:border-[#d9d5c8] focus:ring-2 focus:ring-[#eae8e0]/70"
-                min="1"
-                type="number"
-                value={officerId}
-                onChange={(event) => setOfficerId(event.target.value)}
-              />
-            </label>
-            <span className="inline-flex items-center gap-2 rounded-lg border border-[#eae8e0] bg-[#efeee8] px-3 py-2 text-sm text-zinc-600">
-              <CircleDot className="h-4 w-4 text-emerald-600" />
-              {queue.length} active
+          <PanelHeader
+            eyebrow="Terrain-Weighted Priority"
+            icon={ShieldAlert}
+            title="Operational work queue"
+          />
+          <div className="flex flex-wrap gap-2 text-xs font-semibold text-zinc-600">
+            <span className="rounded-lg border border-[#eae8e0] bg-white px-3 py-2 shadow-sm shadow-[#eae8e0]/40">
+              Active tickets: {queue.length}
+            </span>
+            <span className="rounded-lg border border-[#eae8e0] bg-white px-3 py-2 shadow-sm shadow-[#eae8e0]/40">
+              Top score: {sortedQueue[0] ? calculateCompositeScore(sortedQueue[0]) : 0}
             </span>
           </div>
         </div>
@@ -912,78 +905,87 @@ function FieldOfficerDesk() {
             <InlineSuccess message={success} />
           </div>
         )}
-        {error && !selectedTicket && (
-          <div className="mt-4">
-            <InlineError message={error} />
-          </div>
-        )}
 
-        <div className="mt-5 overflow-x-auto rounded-lg border border-[#eae8e0] bg-[#f9f9f7] shadow-sm shadow-[#eae8e0]/50">
-          <div className="min-w-[760px]">
-            <div className="grid grid-cols-[1.25fr_2fr_0.85fr_1fr_0.9fr] gap-3 bg-[#eae8e0] border-b border-[#eae8e0] px-4 py-3.5 text-xs font-bold uppercase tracking-wider text-zinc-600">
-              <span>Ticket ID</span>
-              <span>Title</span>
-              <span>Priority</span>
-              <span>SLA Target</span>
-              <span className="text-right">Action</span>
-            </div>
+        <div className="mt-5 overflow-hidden rounded-lg border border-[#eae8e0] bg-[#f9f9f7]">
+          <div className="overflow-x-auto">
+            <div className="min-w-[1020px]">
+              <div className="grid grid-cols-[0.6fr_1.45fr_1.2fr_1.3fr_0.9fr_0.9fr_0.8fr] gap-3 border-b border-[#eae8e0] bg-[#efeee8] px-4 py-3 text-xs font-bold uppercase tracking-wider text-zinc-600">
+                <span>Score</span>
+                <span>Ticket</span>
+                <span>Location</span>
+                <span>Infrastructure</span>
+                <span>Priority</span>
+                <span>SLA</span>
+                <span className="text-right">Action</span>
+              </div>
 
-            <div className="divide-y divide-[#eae8e0] bg-[#f9f9f7]">
-              {loadingQueue ? (
-                <div className="flex items-center justify-center gap-2 px-4 py-8 text-sm font-medium text-zinc-500">
-                  <Loader2
-                    className="h-4 w-4 animate-spin"
-                    aria-hidden="true"
-                  />
-                  Syncing live departmental queue...
-                </div>
-              ) : queue.length === 0 ? (
-                <div className="px-4 py-8 text-center text-sm font-medium text-zinc-500">
-                  No open complaints assigned to this officer ward.
-                </div>
-              ) : (
-                sortedQueue.map((ticket, idx) => {
-                  const sla = getSlaMeta(ticket.sla_due_date);
+              <div className="divide-y divide-[#eae8e0]">
+                {sortedQueue.length === 0 ? (
+                  <div className="px-4 py-8 text-center text-sm font-medium text-zinc-500">
+                    No open monsoon infrastructure complaints.
+                  </div>
+                ) : (
+                  sortedQueue.map((ticket, index) => {
+                    const effectivePriority = getEffectivePriority(ticket);
+                    const sla = getSlaMeta(ticket, nowMs);
 
-                  return (
-                    <div
-                      key={ticket.ticket_id}
-                      className={cx(
-                        "grid grid-cols-[1.25fr_2fr_0.85fr_1fr_0.9fr] items-center gap-3 px-4 py-3 text-sm transition hover:bg-[#eae8e0]/60",
-                        idx % 2 === 0 ? "bg-[#f9f9f7]" : "bg-[#efeee8]",
-                      )}
-                    >
-                      <span className="min-w-0 break-all font-mono text-xs font-medium text-zinc-700">
-                        {ticket.ticket_id}
-                      </span>
-                      <span className="min-w-0 text-zinc-900">
-                        {ticket.title}
-                      </span>
-                      <span>
-                        <Badge className={priorityTone[ticket.priority]}>
-                          {ticket.priority}
-                        </Badge>
-                      </span>
-                      <span>
-                        <Badge className={sla.tone}>{sla.label}</Badge>
-                      </span>
-                      <span className="flex justify-end">
-                        <button
-                          className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#1a2332] px-3.5 text-xs font-bold text-[#f9f9f7] shadow-sm shadow-[#1a2332]/10 transition-all duration-200 hover:bg-[#233044]"
-                          onClick={() => openResolution(ticket)}
-                          type="button"
-                        >
-                          Resolve
-                          <ArrowRight
-                            className="h-3.5 w-3.5"
-                            aria-hidden="true"
-                          />
-                        </button>
-                      </span>
-                    </div>
-                  );
-                })
-              )}
+                    return (
+                      <div
+                        className={cx(
+                          "grid grid-cols-[0.6fr_1.45fr_1.2fr_1.3fr_0.9fr_0.9fr_0.8fr] items-center gap-3 px-4 py-3 text-sm transition hover:bg-[#eae8e0]/60",
+                          index % 2 === 0 ? "bg-[#f9f9f7]" : "bg-[#efeee8]",
+                        )}
+                        key={ticket.id}
+                      >
+                        <span className="font-mono text-sm font-bold tabular-nums text-[#1a2332]">
+                          {calculateCompositeScore(ticket)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block break-all font-mono text-xs font-medium text-zinc-600">
+                            {ticket.id}
+                          </span>
+                          <span className="mt-1 block truncate font-semibold text-zinc-950">
+                            {ticket.title}
+                          </span>
+                        </span>
+                        <span className="text-zinc-700">
+                          {ticket.district}
+                          <span className="block text-xs text-zinc-500">
+                            {ticket.block} / {ticket.panchayat}
+                          </span>
+                        </span>
+                        <span className="text-zinc-700">
+                          {ticket.infrastructureType}
+                          <span className="block text-xs text-zinc-500">
+                            {ticket.terrainRisk}
+                          </span>
+                        </span>
+                        <span className="flex flex-col items-start gap-1">
+                          <Badge className={priorityTone[effectivePriority]}>
+                            {priorityLabel[effectivePriority]}
+                          </Badge>
+                          <span className="text-xs font-semibold text-zinc-500">
+                            {ticket.upvotes} upvotes
+                          </span>
+                        </span>
+                        <span>
+                          <Badge className={sla.tone}>{sla.label}</Badge>
+                        </span>
+                        <span className="flex justify-end">
+                          <button
+                            className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#1a2332] px-3.5 text-xs font-bold text-[#f9f9f7] shadow-sm shadow-[#1a2332]/10 transition-all duration-200 hover:bg-[#233044]"
+                            onClick={() => openResolution(ticket)}
+                            type="button"
+                          >
+                            Resolve
+                            <ArrowRight className="h-3.5 w-3.5" aria-hidden="true" />
+                          </button>
+                        </span>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -991,14 +993,14 @@ function FieldOfficerDesk() {
 
       {selectedTicket && (
         <div className="fixed inset-0 z-50 grid place-items-center bg-zinc-950/40 p-4 backdrop-blur-sm">
-          <section className="w-full max-w-2xl rounded-lg border border-[#eae8e0] bg-[#f9f9f7] shadow-2xl shadow-zinc-950/10 animate-in fade-in zoom-in-95 duration-150">
+          <section className="w-full max-w-2xl rounded-lg border border-[#eae8e0] bg-[#f9f9f7] shadow-2xl shadow-zinc-950/10 animate-in fade-in zoom-in-95">
             <div className="flex items-start justify-between gap-4 border-b border-[#eae8e0] bg-[#efeee8] p-5">
-              <div>
+              <div className="min-w-0">
                 <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
                   Resolution Evidence
                 </p>
-                <h2 className="mt-1 text-lg font-semibold text-zinc-900">
-                  {selectedTicket.ticket_id}
+                <h2 className="mt-1 break-all text-lg font-semibold text-zinc-900">
+                  {selectedTicket.id}
                 </h2>
                 <p className="mt-1 text-sm text-zinc-600">
                   {selectedTicket.title}
@@ -1006,7 +1008,7 @@ function FieldOfficerDesk() {
               </div>
               <button
                 aria-label="Close resolution modal"
-                className="grid h-9 w-9 place-items-center rounded-lg border border-[#eae8e0] bg-[#f9f9f7] text-zinc-500 transition hover:bg-[#efeee8] hover:text-zinc-900"
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-[#eae8e0] bg-[#f9f9f7] text-zinc-500 transition hover:bg-[#efeee8] hover:text-zinc-900"
                 onClick={closeResolution}
                 type="button"
               >
@@ -1028,10 +1030,8 @@ function FieldOfficerDesk() {
                   <input
                     className={inputClass}
                     placeholder="https://..."
-                    value={resolutionPhotoUrl}
-                    onChange={(event) =>
-                      setResolutionPhotoUrl(event.target.value)
-                    }
+                    value={validationImageUrl}
+                    onChange={(event) => setValidationImageUrl(event.target.value)}
                   />
                   <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[#eae8e0] bg-[#efeee8] text-zinc-500">
                     <ImagePlus className="h-4 w-4" aria-hidden="true" />
@@ -1051,21 +1051,10 @@ function FieldOfficerDesk() {
                 </button>
                 <button
                   className="inline-flex h-10 items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-zinc-300"
-                  disabled={
-                    loading
-                    || !resolutionNotes.trim()
-                    || !resolutionPhotoUrl.trim()
-                  }
+                  disabled={!resolutionNotes.trim() || !validationImageUrl.trim()}
                   type="submit"
                 >
-                  {loading ? (
-                    <Loader2
-                      className="h-4 w-4 animate-spin"
-                      aria-hidden="true"
-                    />
-                  ) : (
-                    <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
-                  )}
+                  <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                   Confirm Resolution
                 </button>
               </div>
@@ -1077,101 +1066,86 @@ function FieldOfficerDesk() {
   );
 }
 
-function ExecutiveHub() {
-  const [payload, setPayload] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+function ExecutiveHub({ grievances, nowMs }) {
+  const [refreshing, setRefreshing] = useState(false);
 
-  async function loadExecutiveAlerts() {
-    setLoading(true);
-    setError("");
+  const metrics = useMemo(() => {
+    const highUpvoteEmergencies = grievances.filter(
+      (ticket) => ticket.upvotes > UPVOTE_CRITICAL_THRESHOLD,
+    ).length;
+    const verifiedResolved = grievances.filter(
+      (ticket) => ticket.status === "Verified Resolved",
+    ).length;
 
-    try {
-      const data = await apiRequest("/api/v1/admin/executive-alerts");
-      setPayload(data);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setLoading(false);
-    }
+    return {
+      totalGrievances: grievances.length,
+      highUpvoteEmergencies,
+      activePending: grievances.length - verifiedResolved,
+      verifiedResolved,
+    };
+  }, [grievances]);
+
+  const districtLoadData = useMemo(() => {
+    return hpLocationMatrix.map(({ district }) => {
+      const districtTickets = grievances.filter(
+        (ticket) => ticket.district === district,
+      );
+      const landslideBridge = districtTickets.filter(
+        (ticket) =>
+          ticket.terrainRisk === "Landslide Vulnerable Link" ||
+          ticket.infrastructureType === "Connecting Bailey Bridge",
+      );
+
+      return {
+        district,
+        Total: districtTickets.length,
+        HighUpvote: districtTickets.filter(
+          (ticket) => ticket.upvotes > UPVOTE_CRITICAL_THRESHOLD,
+        ).length,
+        LandslideBridge: landslideBridge.length,
+      };
+    });
+  }, [grievances]);
+
+  const executiveAlerts = useMemo(
+    () =>
+      [...grievances]
+        .filter(
+          (ticket) =>
+            ticket.status !== "Verified Resolved" &&
+            (ticket.upvotes > UPVOTE_CRITICAL_THRESHOLD ||
+              isSlaBreached(ticket, nowMs) ||
+              ticket.terrainRisk === FLASH_FLOOD_RISK),
+        )
+        .sort(
+          (left, right) =>
+            calculateCompositeScore(right) - calculateCompositeScore(left),
+        )
+        .slice(0, 4),
+    [grievances, nowMs],
+  );
+
+  function refreshTelemetry() {
+    setRefreshing(true);
+    window.setTimeout(() => setRefreshing(false), 450);
   }
-
-  // Side-effect isolated initial layout fetch
-  useEffect(() => {
-    const controller = new AbortController();
-
-    async function fetchInitialExecutiveAlerts() {
-      try {
-        const data = await apiRequest("/api/v1/admin/executive-alerts", {
-          signal: controller.signal,
-        });
-
-        if (!controller.signal.aborted) {
-          setPayload(data);
-          setError("");
-        }
-      } catch (requestError) {
-        if (!controller.signal.aborted) {
-          setError(requestError.message);
-        }
-      } finally {
-        if (!controller.signal.aborted) {
-          setLoading(false);
-        }
-      }
-    }
-
-    fetchInitialExecutiveAlerts();
-
-    return () => controller.abort();
-  }, []);
-
-  const metrics = payload?.metrics || {
-    total_complaints: 0,
-    pending_count: 0,
-    in_progress_count: 0,
-    resolved_count: 0,
-    reopened_count: 0,
-  };
-  const alerts = (payload?.alert_details || []).map(normalizeAlert);
-  const activePending =
-    Number(metrics.pending_count || 0) + Number(metrics.in_progress_count || 0);
-  const departmentLoadData = alerts
-    .filter((alert) => alert.type === "administrative_sla_breach")
-    .map((alert) => ({
-      department: alert.department_code || alert.department_name || "Branch",
-      Active: Number(alert.active_count || 0),
-      Overdue: Number(alert.overdue_count || 0),
-    }));
-  const chartData = departmentLoadData.length
-    ? departmentLoadData
-    : [
-        {
-          department: "All",
-          Active: activePending + Number(metrics.reopened_count || 0),
-          Overdue: 0,
-        },
-      ];
 
   return (
     <div className="grid gap-5">
       <section className="rounded-lg border border-[#eae8e0] bg-[#f9f9f7] p-5 shadow-sm shadow-[#eae8e0]/50">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
-              CM Office Command
-            </p>
-            <h2 className="mt-1 text-xl font-semibold text-zinc-900">
-              Executive alerts and compliance telemetry
-            </h2>
-          </div>
+          <PanelHeader
+            eyebrow="CM Office Command"
+            icon={Gauge}
+            title="Executive telemetry and monsoon accountability"
+          />
           <button
             className="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-[#eae8e0] bg-[#f9f9f7] px-4 text-sm font-semibold text-zinc-700 shadow-sm shadow-[#eae8e0]/50 transition hover:bg-[#efeee8] disabled:cursor-not-allowed disabled:text-zinc-400"
-            disabled={loading}
-            onClick={loadExecutiveAlerts}
+            disabled={refreshing}
+            onClick={refreshTelemetry}
             type="button"
           >
-            {loading ? (
+            {refreshing ? (
               <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
             ) : (
               <RefreshCcw className="h-4 w-4" aria-hidden="true" />
@@ -1180,98 +1154,78 @@ function ExecutiveHub() {
           </button>
         </div>
 
-        {error && <div className="mt-4"><InlineError message={error} /></div>}
-
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
           <KpiCard
-            icon={Gauge}
+            icon={FileText}
             label="Total Grievances"
-            surface="bg-[#efeee8] border-[#eae8e0] shadow-sm shadow-[#eae8e0]/40"
+            surface="border-[#eae8e0] bg-[#efeee8] shadow-sm shadow-[#eae8e0]/40"
             tone="text-zinc-900"
-            value={metrics.total_complaints}
+            value={metrics.totalGrievances}
+          />
+          <KpiCard
+            icon={Siren}
+            label="High-Upvote Emergencies"
+            surface="border-rose-200/50 bg-rose-100/60 text-rose-900"
+            tone="text-rose-900"
+            value={metrics.highUpvoteEmergencies}
           />
           <KpiCard
             icon={Clock3}
             label="Active Pending"
-            surface="bg-amber-50/40 border-amber-200/60 text-amber-900"
+            surface="border-amber-200/50 bg-amber-100/60 text-amber-900"
             tone="text-amber-900"
-            value={activePending}
+            value={metrics.activePending}
           />
           <KpiCard
             icon={CheckCircle2}
             label="Verified Resolved"
-            surface="bg-emerald-50/40 border-emerald-200/60 text-emerald-900"
+            surface="border-emerald-200/60 bg-emerald-50/60 text-emerald-900"
             tone="text-emerald-900"
-            value={metrics.resolved_count}
-          />
-          <KpiCard
-            icon={RefreshCcw}
-            label="Reopened Tickets"
-            surface="bg-rose-50/40 border-rose-200/60 text-rose-900"
-            tone="text-rose-900"
-            value={metrics.reopened_count}
+            value={metrics.verifiedResolved}
           />
         </div>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
         <section className="rounded-lg border border-[#eae8e0] bg-[#f9f9f7] p-5 shadow-sm shadow-[#eae8e0]/50">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
-                Alert Stream
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-zinc-900">
-                Proactive administrative warnings
-              </h2>
-            </div>
-            <Bell className="h-5 w-5 text-zinc-500" aria-hidden="true" />
-          </div>
+          <PanelHeader
+            eyebrow="Alert Stream"
+            icon={Bell}
+            title="Executive monsoon signals"
+          />
 
-          {loading && !payload ? (
-            <EmptyState
-              icon={Loader2}
-              title="Loading executive feed"
-              detail="Fetching active signals."
-              spinning
-            />
-          ) : alerts.length ? (
-            <div className="grid gap-3">
-              {alerts.map((alert, index) => (
-                <AlertCard
-                  alert={alert}
-                  key={`${alert.type}-${alert.message}-${index}`}
+          {executiveAlerts.length ? (
+            <div className="mt-5 grid gap-3">
+              {executiveAlerts.map((ticket) => (
+                <ExecutiveAlertCard
+                  key={ticket.id}
+                  nowMs={nowMs}
+                  ticket={ticket}
                 />
               ))}
             </div>
           ) : (
             <EmptyState
+              detail="No high-risk district signals are active."
               icon={BadgeCheck}
-              title="No active alerts"
-              detail="All monitored rules are currently clear."
+              title="Telemetry clear"
             />
           )}
         </section>
 
         <section className="rounded-lg border border-[#eae8e0] bg-[#f9f9f7] p-5 shadow-sm shadow-[#eae8e0]/50">
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
-                Infrastructure Load
-              </p>
-              <h2 className="mt-1 text-lg font-semibold text-zinc-900">
-                Active vs overdue by branch
-              </h2>
-            </div>
-            <Building2 className="h-5 w-5 text-zinc-500" aria-hidden="true" />
-          </div>
+          <PanelHeader
+            eyebrow="Infrastructure Load"
+            icon={Building2}
+            title="Infrastructural Load by District"
+          />
 
-          <div className="h-80 rounded-lg border border-[#eae8e0] bg-[#efeee8]/70 p-3">
+          <div className="mt-5 h-80 rounded-lg border border-[#eae8e0] bg-[#efeee8]/70 p-3">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={chartData} margin={{ left: 0, right: 8 }}>
+              <BarChart data={districtLoadData} margin={{ left: 0, right: 8 }}>
                 <CartesianGrid stroke="#e4e4e7" strokeDasharray="3 3" />
                 <XAxis
-                  dataKey="department"
+                  dataKey="district"
                   fontSize={12}
                   stroke="#71717a"
                   tickLine={false}
@@ -1291,8 +1245,19 @@ function ExecutiveHub() {
                   }}
                 />
                 <Legend />
-                <Bar dataKey="Active" fill="#18181b" radius={[6, 6, 0, 0]} />
-                <Bar dataKey="Overdue" fill="#e11d48" radius={[6, 6, 0, 0]} />
+                <Bar dataKey="Total" fill="#1a2332" radius={[6, 6, 0, 0]} />
+                <Bar
+                  dataKey="HighUpvote"
+                  fill="#9f1239"
+                  name="High-Upvote"
+                  radius={[6, 6, 0, 0]}
+                />
+                <Bar
+                  dataKey="LandslideBridge"
+                  fill="#b45309"
+                  name="Landslide/Bridge"
+                  radius={[6, 6, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -1302,81 +1267,63 @@ function ExecutiveHub() {
   );
 }
 
-function AlertCard({ alert }) {
-  const isCluster = alert.type === "geographic_cluster_surge";
-  const isSla = alert.type === "administrative_sla_breach";
-  const Icon = isSla ? Siren : AlertTriangle;
-  const tone = isSla
-    ? "border-rose-100/80 bg-rose-50/50 text-rose-900"
-    : isCluster
-      ? "border-amber-100/80 bg-amber-50/50 text-amber-900"
-      : "border-[#eae8e0] bg-[#efeee8] text-zinc-900";
-  const iconTone = isSla
-    ? "bg-rose-100/70 text-rose-700"
-    : isCluster
-      ? "bg-amber-100/70 text-amber-700"
-      : "bg-[#f9f9f7] text-zinc-700";
+function ExecutiveAlertCard({ nowMs, ticket }) {
+  const sla = getSlaMeta(ticket, nowMs);
+  const isCluster = ticket.upvotes > UPVOTE_CRITICAL_THRESHOLD;
+  const isFlood = ticket.terrainRisk === FLASH_FLOOD_RISK;
+  const Icon = isCluster || isFlood ? Siren : AlertTriangle;
 
   return (
-    <article className={cx("rounded-lg border p-4 shadow-sm shadow-[#eae8e0]/40", tone)}>
+    <article className="rounded-lg border border-rose-100/80 bg-rose-50/50 p-4 text-rose-900 shadow-sm shadow-[#eae8e0]/40">
       <div className="flex items-start gap-3">
-        <div className={cx("grid h-9 w-9 shrink-0 place-items-center rounded-lg", iconTone)}>
+        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-rose-100/70 text-rose-800">
           <Icon className="h-4 w-4" aria-hidden="true" />
         </div>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm font-semibold">
-              {isSla
-                ? "Administrative SLA breach"
-                : isCluster
-                  ? "Geographic cluster surge"
-                  : "Executive signal"}
+              {isCluster
+                ? "High-upvote infrastructure emergency"
+                : isFlood
+                  ? "Flash flood corridor escalation"
+                  : "SLA risk escalation"}
             </p>
-            <span className="rounded-md border border-[#eae8e0] bg-[#f9f9f7]/80 px-2 py-0.5 text-xs font-medium">
-              {alert.severity}
-            </span>
+            <Badge className={sla.tone}>{sla.label}</Badge>
           </div>
-          <p className="mt-2 text-sm leading-6">{alert.message}</p>
-
-          {isSla && (
-            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
-              <AlertDatum
-                label="Department"
-                value={alert.department_code || alert.department_name || "N/A"}
-              />
-              <AlertDatum
-                label="Overdue"
-                value={String(alert.overdue_count ?? 0)}
-              />
-              <AlertDatum
-                label="Compliance"
-                value={`${Math.round(Number(alert.compliance_rate || 0) * 100)}%`}
-              />
-            </div>
-          )}
-
-          {isCluster && (
-            <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
-              <AlertDatum label="Ward" value={alert.ward_name || "N/A"} />
-              <AlertDatum
-                label="Subcategory"
-                value={alert.subcategory_name || "N/A"}
-              />
-              <AlertDatum
-                label="Active"
-                value={String(alert.active_count ?? 0)}
-              />
-            </div>
-          )}
+          <p className="mt-2 text-sm leading-6">{ticket.title}</p>
+          <div className="mt-3 grid gap-2 text-xs sm:grid-cols-3">
+            <AlertDatum label="District" value={ticket.district} />
+            <AlertDatum label="Upvotes" value={String(ticket.upvotes)} />
+            <AlertDatum
+              label="Composite"
+              value={String(calculateCompositeScore(ticket))}
+            />
+          </div>
         </div>
       </div>
     </article>
   );
 }
 
+function PanelHeader({ eyebrow, icon: Icon, title }) {
+  return (
+    <div className="flex items-start justify-between gap-4">
+      <div className="min-w-0">
+        <p className="text-xs font-medium uppercase tracking-[0.16em] text-zinc-500">
+          {eyebrow}
+        </p>
+        <h2 className="mt-1 text-xl font-semibold text-zinc-900">{title}</h2>
+      </div>
+      <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-[#1a2332]/10 bg-[#1a2332]/5 text-[#1a2332]">
+        <Icon className="h-5 w-5" aria-hidden="true" />
+      </div>
+    </div>
+  );
+}
+
 function AlertDatum({ label, value }) {
   return (
-    <div className="rounded-md border border-[#eae8e0] bg-[#f9f9f7]/80 px-3 py-2">
+    <div className="rounded-md border border-rose-100/80 bg-[#f9f9f7]/80 px-3 py-2">
       <p className="font-medium uppercase tracking-[0.12em] opacity-60">
         {label}
       </p>
@@ -1405,7 +1352,9 @@ function MetricPill({ label, value }) {
       <p className="text-xs font-medium uppercase tracking-[0.14em] text-zinc-500">
         {label}
       </p>
-      <p className="mt-2 text-sm font-semibold text-zinc-900">{value}</p>
+      <p className="mt-2 break-words text-sm font-semibold text-zinc-900">
+        {value}
+      </p>
     </div>
   );
 }
@@ -1450,21 +1399,118 @@ function InlineSuccess({ message }) {
   );
 }
 
-function EmptyState({ icon: Icon, title, detail, spinning = false }) {
+function EmptyState({ icon: Icon, title, detail }) {
   return (
     <div className="mt-5 grid min-h-44 place-items-center rounded-lg border border-dashed border-[#eae8e0] bg-[#efeee8]/70 p-6 text-center">
       <div>
         <div className="mx-auto grid h-10 w-10 place-items-center rounded-lg border border-[#eae8e0] bg-[#f9f9f7] text-zinc-500 shadow-sm shadow-[#eae8e0]/50">
-          <Icon
-            className={cx("h-5 w-5", spinning && "animate-spin")}
-            aria-hidden="true"
-          />
+          <Icon className="h-5 w-5" aria-hidden="true" />
         </div>
         <p className="mt-3 text-sm font-semibold text-zinc-900">{title}</p>
         <p className="mt-1 text-sm text-zinc-500">{detail}</p>
       </div>
     </div>
   );
+}
+
+function calculateCompositeScore(ticket) {
+  const priority = getEffectivePriority(ticket);
+
+  return (
+    (priority === "critical" ? 60 : 20) +
+    ticket.upvotes * 2 +
+    (ticket.terrainRisk === FLASH_FLOOD_RISK ? 15 : 0)
+  );
+}
+
+function getEffectivePriority(ticket) {
+  return ticket.upvotes > UPVOTE_CRITICAL_THRESHOLD ? "critical" : ticket.priority;
+}
+
+function derivePriorityFromTerrain(terrainRisk) {
+  if (terrainRisk === FLASH_FLOOD_RISK) {
+    return "critical";
+  }
+
+  if (
+    terrainRisk === "Landslide Vulnerable Link" ||
+    terrainRisk === "High-Alpine Alpine Track"
+  ) {
+    return "high";
+  }
+
+  return "medium";
+}
+
+function priorityToSlaHours(priority) {
+  if (priority === "critical") {
+    return 8;
+  }
+
+  if (priority === "high") {
+    return 24;
+  }
+
+  return 72;
+}
+
+function getSlaMeta(ticket, nowMs) {
+  if (ticket.status === "Verified Resolved") {
+    return {
+      label: "Verified",
+      tone: "border-emerald-200/50 bg-emerald-100/50 text-emerald-900",
+    };
+  }
+
+  const target = new Date(ticket.slaDueAt).getTime();
+  const diffHours = (target - nowMs) / (1000 * 60 * 60);
+
+  if (diffHours < 0) {
+    return {
+      label: "Breached",
+      tone: "border-amber-200/50 bg-amber-100/60 text-amber-900",
+    };
+  }
+
+  if (diffHours <= 6) {
+    return {
+      label: `${Math.ceil(diffHours)}h left`,
+      tone: "border-amber-200/50 bg-amber-100/60 text-amber-900",
+    };
+  }
+
+  return {
+    label: formatDateTime(ticket.slaDueAt),
+    tone: "border-[#eae8e0] bg-[#efeee8] text-zinc-700",
+  };
+}
+
+function isSlaBreached(ticket, nowMs) {
+  return (
+    ticket.status !== "Verified Resolved" &&
+    new Date(ticket.slaDueAt).getTime() < nowMs
+  );
+}
+
+function offsetDate(hoursFromNow) {
+  return addHours(new Date(), hoursFromNow).toISOString();
+}
+
+function addHours(date, hours) {
+  return new Date(date.getTime() + hours * 60 * 60 * 1000);
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return "Not set";
+  }
+
+  return new Intl.DateTimeFormat("en-IN", {
+    day: "2-digit",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
 }
 
 export default App;

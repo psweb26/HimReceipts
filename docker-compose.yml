@@ -1,33 +1,54 @@
 services:
   db:
-    image: postgres:15-alpine
-    container_name: delhi_db
-    restart: always
+    image: postgres:16-alpine
+    container_name: himachal_postgres
+    restart: unless-stopped
     environment:
-      POSTGRES_USER: gov_admin
-      POSTGRES_PASSWORD: SecretGovPassword2026
-      POSTGRES_DB: delhi_accountability
-    ports:
-      - "5432:5432"
+      POSTGRES_DB: "himachal_accountability"
+      POSTGRES_USER: "gov_admin"
+      POSTGRES_PASSWORD: "SecretGovPassword2026"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - himachal_postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gov_admin -d delhi_accountability"]
-      interval: 5s
+      test: ["CMD-SHELL", "pg_isready -U gov_admin -d himachal_accountability"]
+      interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   backend:
-    build: ./backend
-    container_name: delhi_backend
-    restart: always
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.backend
+    container_name: himachal_backend
+    restart: unless-stopped
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://gov_admin:SecretGovPassword2026@db:5432/delhi_accountability
+      DATABASE_URL: "postgresql://gov_admin:SecretGovPassword2026@db:5432/himachal_accountability"
+      MUNICIPAL_REGION: "HIMACHAL_PRADESH"
+      MONSOON_COMMAND_STATE: "ACTIVE"
     depends_on:
       db:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.frontend
+    container_name: himachal_frontend
+    restart: unless-stopped
+    ports:
+      - "5173:5173"
+    depends_on:
+      backend:
+        condition: service_healthy
 
 volumes:
-  postgres_data:
+  himachal_postgres_data:

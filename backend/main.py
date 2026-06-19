@@ -1,18 +1,20 @@
-import math
+import os
 import re
 import threading
 import time
 from datetime import datetime, timedelta, timezone
+from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from database import get_db
+from database import Base, SessionLocal, engine, get_db
+from security import hash_password, verify_password
 from models import (
     Category,
     Citizen,
@@ -23,23 +25,84 @@ from models import (
     Notification,
     Officer,
     Subcategory,
-    Ward,
-    post_status_enum,
 )
 
+MUNICIPAL_REGION = os.getenv("MUNICIPAL_REGION", "HIMACHAL_PRADESH")
+MONSOON_COMMAND_STATE = os.getenv("MONSOON_COMMAND_STATE", "ACTIVE")
 
-ACTIVE_STATUSES = ("Pending", "In Progress", "Reopened")
-PRIORITY_ORDER = ("Low", "Medium", "High", "Critical")
-DEDUP_RADIUS_METERS = 50
-DEDUP_WINDOW_DAYS = 14
-LOCAL_SURGE_THRESHOLD = 3
+UPVOTE_CRITICAL_THRESHOLD = 30
+ACTIVE_STATUSES = ("Pending", "Under Verification", "In Progress", "Reopened")
 SLA_MONITOR_INTERVAL_SECONDS = 60
+
+HIMACHAL_ADMIN_HIERARCHY: Dict[str, Dict[str, List[str]]] = {
+    "Kullu": {
+        "Anni": ["Draman", "Kungash", "Lajheri"],
+        "Bhuntar": ["Bari", "Sainj", "Jari"],
+        "Nirmand": ["Arsu", "Deem", "Bagi Sarahan"],
+    },
+    "Mandi": {
+        "Seraj": ["Bali Chowki", "Thunag", "Janjehli"],
+        "Drang": ["Katindhi", "Pali", "Uhal"],
+        "Balh": ["Kummi", "Gagal", "Ratti"],
+    },
+    "Shimla": {
+        "Rohru": ["Chirgaon", "Samoli", "Pujarli"],
+        "Mashobra": ["Baldeyan", "Bhont", "Dhalli"],
+        "Theog": ["Matiana", "Kiari", "Deha"],
+    },
+    "Kangra": {
+        "Baijnath": ["Paprola", "Bir", "Kothi Kohar"],
+        "Dharamshala": ["Rakkar", "Tang Narwana", "Sidhpur"],
+        "Nurpur": ["Rehan", "Sadwan", "Bassa Waziran"],
+    },
+    "Lahaul & Spiti": {
+        "Keylong": ["Sissu", "Gondhla", "Jispa"],
+        "Kaza": ["Kibber", "Langza", "Tabo"],
+        "Udaipur": ["Triloknath", "Miyar", "Tindi"],
+    },
+}
+
+DEPARTMENT_BY_INFRASTRUCTURE_TYPE = {
+    "Connecting Bailey Bridge": "Public Works Department",
+    "Drinking Water Line": "Jal Shakti Vibhag",
+    "NH Highway Link": "National Highways Wing",
+    "Power Grid Substation": "HPSEBL Operations",
+}
+
+DEPARTMENT_CODES = {
+    "Public Works Department": "PWD",
+    "Jal Shakti Vibhag": "JSV",
+    "National Highways Wing": "NHW",
+    "HPSEBL Operations": "HPSEBL",
+}
+
+TERRAIN_PRIORITY = {
+    "Flash Flood Khud Proximity": "critical",
+    "Landslide Vulnerable Link": "high",
+    "High-Alpine Alpine Track": "high",
+    "Standard Rural Road": "medium",
+}
+
+SLA_HOURS_BY_PRIORITY = {
+    "critical": 8,
+    "high": 24,
+    "medium": 72,
+    "low": 72,
+}
+
+DEFAULT_COORDINATES_BY_DISTRICT = {
+    "Kullu": (31.9592, 77.1089),
+    "Mandi": (31.7087, 76.9320),
+    "Shimla": (31.1048, 77.1734),
+    "Kangra": (32.0998, 76.2691),
+    "Lahaul & Spiti": (32.6195, 77.3784),
+}
+
 sla_monitor_thread: Optional[threading.Thread] = None
 
-
 app = FastAPI(
-    title="Delhi Accountability Monitoring System API",
-    version="1.0.0",
+    title="HimSetu Structural Backplane Core",
+    version="2.1.0",
 )
 
 app.add_middleware(
@@ -48,9 +111,11 @@ app.add_middleware(
         "http://localhost:3000",
         "http://localhost:5173",
         "http://localhost:5174",
+        "http://localhost:8000",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:5173",
         "http://127.0.0.1:5174",
+        "http://127.0.0.1:8000",
     ],
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
@@ -59,82 +124,44 @@ app.add_middleware(
         "Authorization",
         "Content-Type",
         "Origin",
+        "X-Monsoon-Command-State",
+        "X-Municipal-Region",
         "X-Requested-With",
     ],
 )
-
 
 class OTPLoginRequest(BaseModel):
     phone: str = Field(..., min_length=10, max_length=15)
     otp: str = Field(..., min_length=4, max_length=6)
 
-
 class StaffLoginRequest(BaseModel):
     email: EmailStr
     password: str
 
-
-class GrievanceDetailResponse(BaseModel):
+class GrievanceResponse(BaseModel):
     id: int
     ticket_id: str
     title: str
     description: str
+    district: str
+    block: str
+    panchayat: str
+    upvotes: int
+    terrainRisk: str
+    infrastructureType: str
+    department: str
     status: str
     priority: str
-    latitude: float
-    longitude: float
     sla_due_date: datetime
     created_at: datetime
     resolved_at: Optional[datetime] = None
-    resolution_notes: Optional[str] = None
-    resolution_photo_url: Optional[str] = None
-    district_name: str
-    ward_name: str
-    department_name: str
-
-    class Config:
-        from_attributes = True
-
-
-class OfficerQueueResponse(BaseModel):
-    ticket_id: str
-    title: str
-    priority: str
-    sla_due_date: datetime
-    status: str
-
-    class Config:
-        from_attributes = True
-
-
-class GrievanceIntakeRequest(BaseModel):
-    citizen_id: int = Field(..., gt=0)
-    subcategory_id: int = Field(..., gt=0)
-    latitude: float = Field(..., ge=-90, le=90)
-    longitude: float = Field(..., ge=-180, le=180)
-    district_id: int = Field(..., gt=0)
-    ward_id: int = Field(..., gt=0)
-    title: str = Field(..., min_length=1, max_length=150)
-    description: str = Field(..., min_length=1)
-    intake_photo_url: Optional[str] = Field(default="", max_length=255)
-
-
-class GrievanceIntakeResponse(BaseModel):
-    ticket_id: str
-    status: str
-    priority: str
-    assigned_officer_id: int
-    sla_due_date: datetime
-    duplicate_detected: bool
-    nearby_duplicate_count: int
-    is_flagged_to_cmo: bool
-
+    resolutionNotes: Optional[str] = None
+    validationImageUrl: Optional[str] = None
 
 class GrievanceResolveRequest(BaseModel):
-    officer_id: int = Field(..., gt=0)
-    resolution_notes: str
-    resolution_photo_url: str = Field(..., max_length=255)
-
+    resolutionNotes: str
+    validationImageUrl: str = Field(..., max_length=255)
+    officerId: Optional[int] = Field(default=None, gt=0)
 
 class GrievanceResolveResponse(BaseModel):
     ticket_id: str
@@ -143,10 +170,8 @@ class GrievanceResolveResponse(BaseModel):
     resolved_at: datetime
     log_id: int
 
-
 class GrievanceReopenRequest(BaseModel):
     remarks: str
-
 
 class GrievanceReopenResponse(BaseModel):
     ticket_id: str
@@ -157,84 +182,11 @@ class GrievanceReopenResponse(BaseModel):
     sla_due_date: datetime
     log_id: int
 
-
 def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
 
-
-def run_sla_compliance_monitor() -> None:
-    """Background daemon loop checking immediate SLA compliance milestones."""
-    while True:
-        from database import SessionLocal
-
-        worker_db = SessionLocal()
-        try:
-            now = utc_now()
-            breached_tickets = (
-                worker_db.query(Grievance)
-                .filter(
-                    Grievance.status.in_(ACTIVE_STATUSES),
-                    Grievance.sla_due_date < now,
-                    Grievance.is_escalated_to_dm.is_(False),
-                )
-                .all()
-            )
-
-            for ticket in breached_tickets:
-                status_value = enum_value(ticket.status)
-                ticket.is_escalated_to_dm = True
-                ticket.priority = "Critical"
-
-                escalation_message = (
-                    "System Automation Hook: Active SLA countdown breached. "
-                    "Ticket escalated to District Magistrate."
-                )
-                escalation_log = GrievanceLog(
-                    grievance_id=ticket.id,
-                    previous_status=status_value,
-                    new_status=status_value,
-                    remarks=escalation_message,
-                    action_by_officer_id=ticket.assigned_officer_id,
-                )
-                notification = Notification(
-                    grievance_id=ticket.id,
-                    recipient_type="District Magistrate",
-                    channel="Email",
-                    message=(
-                        f"SLA breach alert for ticket {ticket.ticket_id}. "
-                        "Escalated to District Magistrate review."
-                    ),
-                )
-                worker_db.add(escalation_log)
-                worker_db.add(notification)
-
-            worker_db.commit()
-        except Exception as monitor_err:
-            print(
-                "Background monitoring worker error encountered: "
-                f"{monitor_err}"
-            )
-            worker_db.rollback()
-        finally:
-            worker_db.close()
-
-        time.sleep(SLA_MONITOR_INTERVAL_SECONDS)
-
-
-@app.on_event("startup")
-def start_sla_compliance_monitor() -> None:
-    """Starts the lightweight SLA monitor once per FastAPI process."""
-    global sla_monitor_thread
-
-    if sla_monitor_thread and sla_monitor_thread.is_alive():
-        return
-
-    sla_monitor_thread = threading.Thread(
-        target=run_sla_compliance_monitor,
-        daemon=True,
-    )
-    sla_monitor_thread.start()
-
+def enum_value(value: Any) -> str:
+    return value.value if hasattr(value, "value") else str(value)
 
 def require_non_empty(value: Optional[str], field_name: str) -> str:
     if value is None or not value.strip():
@@ -244,178 +196,483 @@ def require_non_empty(value: Optional[str], field_name: str) -> str:
         )
     return value.strip()
 
+def validate_location_hierarchy(district: str, block: str, panchayat: str) -> None:
+    block_map = HIMACHAL_ADMIN_HIERARCHY.get(district)
+    if block_map is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"district must be one of: {', '.join(HIMACHAL_ADMIN_HIERARCHY.keys())}.",
+        )
 
-def enum_value(value: Any) -> str:
-    return value.value if hasattr(value, "value") else str(value)
+    panchayats = block_map.get(block)
+    if panchayats is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"block '{block}' is not configured under district '{district}'.",
+        )
 
+    if panchayat not in panchayats:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"panchayat '{panchayat}' is not configured under {district} / {block}.",
+        )
 
-def elevate_priority(priority: str) -> str:
-    current_index = PRIORITY_ORDER.index(priority)
-    next_index = min(current_index + 1, len(PRIORITY_ORDER) - 1)
-    return PRIORITY_ORDER[next_index]
+def evaluate_priority(terrain_risk: str) -> str:
+    priority = TERRAIN_PRIORITY.get(terrain_risk)
+    if priority is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"terrainRisk must be one of: {', '.join(TERRAIN_PRIORITY.keys())}.",
+        )
+    return priority
 
+def allocate_department_name(infrastructure_type: str) -> str:
+    department_name = DEPARTMENT_BY_INFRASTRUCTURE_TYPE.get(infrastructure_type)
+    if department_name is None:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"infrastructureType must be one of: {', '.join(DEPARTMENT_BY_INFRASTRUCTURE_TYPE.keys())}.",
+        )
+    return department_name
 
-def haversine_meters(
-    lat_a: float,
-    lon_a: float,
-    lat_b: float,
-    lon_b: float,
-) -> float:
-    earth_radius_meters = 6_371_000
-    lat_a_rad = math.radians(lat_a)
-    lat_b_rad = math.radians(lat_b)
-    delta_lat = math.radians(lat_b - lat_a)
-    delta_lon = math.radians(lon_b - lon_a)
+def get_or_create_department(db: Session, department_name: str) -> Department:
+    department = db.query(Department).filter(Department.name == department_name).first()
+    if department is not None:
+        return department
 
-    arc = (
-        math.sin(delta_lat / 2) ** 2
-        + math.cos(lat_a_rad)
-        * math.cos(lat_b_rad)
-        * math.sin(delta_lon / 2) ** 2
+    department = Department(
+        name=department_name,
+        code=DEPARTMENT_CODES[department_name],
     )
-    return earth_radius_meters * 2 * math.atan2(math.sqrt(arc), math.sqrt(1 - arc))
+    db.add(department)
+    db.flush()
+    return department
 
+def get_or_create_district(db: Session, district_name: str) -> District:
+    district = db.query(District).filter(District.name == district_name).first()
+    if district is not None:
+        return district
 
-def bounding_box(
-    latitude: float,
-    longitude: float,
-    radius_meters: int,
-) -> Dict[str, float]:
-    latitude_delta = radius_meters / 111_320
-    longitude_scale = math.cos(math.radians(latitude))
-    longitude_delta = (
-        radius_meters / (111_320 * longitude_scale)
-        if abs(longitude_scale) > 0.000001
-        else 180
+    district = District(name=district_name)
+    db.add(district)
+    db.flush()
+    return district
+
+def get_or_create_citizen(db: Session) -> Citizen:
+    citizen = db.query(Citizen).filter(Citizen.phone == "9999999999").first()
+    if citizen is not None:
+        return citizen
+
+    citizen = Citizen(
+        name="Rina Thakur",
+        phone="9999999999",
+        otp_hash="demo_hash",
     )
+    db.add(citizen)
+    db.flush()
+    return citizen
 
-    return {
-        "min_latitude": latitude - latitude_delta,
-        "max_latitude": latitude + latitude_delta,
-        "min_longitude": longitude - longitude_delta,
-        "max_longitude": longitude + longitude_delta,
-    }
+def get_or_create_category(db: Session, name: str) -> Category:
+    category = db.query(Category).filter(Category.name == name).first()
+    if category is not None:
+        return category
 
+    category = Category(name=name)
+    db.add(category)
+    db.flush()
+    return category
 
-def nearby_active_duplicate_count(
+def get_or_create_subcategory(
     db: Session,
-    subcategory_id: int,
-    latitude: float,
-    longitude: float,
-    now: datetime,
-) -> int:
-    bounds = bounding_box(latitude, longitude, DEDUP_RADIUS_METERS)
-    cutoff = now - timedelta(days=DEDUP_WINDOW_DAYS)
+    category_id: int,
+    department_id: int,
+    name: str,
+    sla_hours: int,
+    base_priority: str,
+) -> Subcategory:
+    subcategory = db.query(Subcategory).filter(Subcategory.name == name).first()
+    if subcategory is not None:
+        return subcategory
 
-    candidates = (
-        db.query(Grievance)
-        .filter(
-            Grievance.subcategory_id == subcategory_id,
-            Grievance.status.in_(ACTIVE_STATUSES),
-            Grievance.created_at >= cutoff,
-            Grievance.latitude.between(
-                bounds["min_latitude"],
-                bounds["max_latitude"],
-            ),
-            Grievance.longitude.between(
-                bounds["min_longitude"],
-                bounds["max_longitude"],
-            ),
-        )
-        .all()
+    subcategory = Subcategory(
+        category_id=category_id,
+        department_id=department_id,
+        name=name,
+        sla_hours=sla_hours,
+        base_priority=base_priority,
     )
+    db.add(subcategory)
+    db.flush()
+    return subcategory
 
-    return sum(
-        1
-        for grievance in candidates
-        if haversine_meters(
-            latitude,
-            longitude,
-            float(grievance.latitude),
-            float(grievance.longitude),
-        )
-        <= DEDUP_RADIUS_METERS
+def get_or_create_officer(
+    db: Session,
+    name: str,
+    department_id: int,
+    district_id: int,
+    block: str,
+    email: str,
+) -> Officer:
+    officer = db.query(Officer).filter(Officer.email == email).first()
+    if officer is not None:
+        return officer
+
+    officer = Officer(
+        name=name,
+        department_id=department_id,
+        service_district_id=district_id,
+        block=block,
+        role="Officer",
+        email=email,
+        password_hash=hash_password("password"),
+        is_active=True,
     )
+    db.add(officer)
+    db.flush()
+    return officer
 
+def bootstrap_database() -> None:
+    Base.metadata.create_all(bind=engine)
+
+    db = SessionLocal()
+    try:
+        districts = {
+            district_name: get_or_create_district(db, district_name)
+            for district_name in HIMACHAL_ADMIN_HIERARCHY
+        }
+        departments = {
+            department_name: get_or_create_department(db, department_name)
+            for department_name in DEPARTMENT_BY_INFRASTRUCTURE_TYPE.values()
+        }
+        citizen = get_or_create_citizen(db)
+        infrastructure_category = get_or_create_category(db, "Monsoon Infrastructure")
+        utilities_category = get_or_create_category(db, "Critical Public Utilities")
+
+        subcategories = {
+            "Connecting Bailey Bridge": get_or_create_subcategory(
+                db,
+                infrastructure_category.id,
+                departments["Public Works Department"].id,
+                "Bailey Bridge Distress",
+                8,
+                "critical",
+            ),
+            "Drinking Water Line": get_or_create_subcategory(
+                db,
+                utilities_category.id,
+                departments["Jal Shakti Vibhag"].id,
+                "Drinking Water Line Washout",
+                24,
+                "high",
+            ),
+            "NH Highway Link": get_or_create_subcategory(
+                db,
+                infrastructure_category.id,
+                departments["National Highways Wing"].id,
+                "Highway Landslide Corridor",
+                24,
+                "high",
+            ),
+            "Power Grid Substation": get_or_create_subcategory(
+                db,
+                utilities_category.id,
+                departments["HPSEBL Operations"].id,
+                "Power Grid Access Failure",
+                24,
+                "high",
+            ),
+        }
+
+        get_or_create_officer(
+            db,
+            "Officer Dev Negi",
+            departments["Public Works Department"].id,
+            districts["Kullu"].id,
+            "Bhuntar",
+            "dev.negi@hp.gov.example",
+        )
+        get_or_create_officer(
+            db,
+            "Officer Meera Rana",
+            departments["Jal Shakti Vibhag"].id,
+            districts["Kullu"].id,
+            "Anni",
+            "meera.rana@hp.gov.example",
+        )
+        get_or_create_officer(
+            db,
+            "Officer Arjun Chauhan",
+            departments["National Highways Wing"].id,
+            districts["Mandi"].id,
+            "Seraj",
+            "arjun.chauhan@hp.gov.example",
+        )
+        get_or_create_officer(
+            db,
+            "Officer Tashi Dolma",
+            departments["HPSEBL Operations"].id,
+            districts["Lahaul & Spiti"].id,
+            "Kaza",
+            "tashi.dolma@hp.gov.example",
+        )
+
+        if db.query(Grievance.id).first() is None:
+            seed_bootstrap_grievances(db, citizen, districts, departments, subcategories)
+
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+def seed_bootstrap_grievances(
+    db: Session,
+    citizen: Citizen,
+    districts: Dict[str, District],
+    departments: Dict[str, Department],
+    subcategories: Dict[str, Subcategory],
+) -> None:
+    now = utc_now()
+    payloads = [
+        {
+            "ticket_id": "HP-2026-PWD-BAILEY-001",
+            "district": "Kullu",
+            "block": "Bhuntar",
+            "panchayat": "Sainj",
+            "terrainRisk": "Flash Flood Khud Proximity",
+            "infrastructureType": "Connecting Bailey Bridge",
+            "title": "Bailey bridge deck plates buckling near Sainj market",
+            "description": "Community crossing over the khud is vibrating under school bus traffic after overnight rainfall.",
+            "upvotes": 42,
+            "hours_ago": 3,
+        },
+        {
+            "ticket_id": "HP-2026-NHW-LANDSLIDE-002",
+            "district": "Mandi",
+            "block": "Seraj",
+            "panchayat": "Thunag",
+            "terrainRisk": "Landslide Vulnerable Link",
+            "infrastructureType": "NH Highway Link",
+            "title": "Road retaining wall slipping on Seraj orchard link",
+            "description": "The lower shoulder has opened a visible crack and loose stone is falling onto the bus route.",
+            "upvotes": 29,
+            "hours_ago": 10,
+        },
+        {
+            "ticket_id": "HP-2026-JSV-WATER-003",
+            "district": "Kullu",
+            "block": "Anni",
+            "panchayat": "Draman",
+            "terrainRisk": "Flash Flood Khud Proximity",
+            "infrastructureType": "Drinking Water Line",
+            "title": "Gravity water line washed out above Draman",
+            "description": "Two hamlets are reporting no drinking water after the exposed pipe snapped at the nala crossing.",
+            "upvotes": 18,
+            "hours_ago": 6,
+        },
+        {
+            "ticket_id": "HP-2026-HPSEBL-POWER-004",
+            "district": "Lahaul & Spiti",
+            "block": "Kaza",
+            "panchayat": "Kibber",
+            "terrainRisk": "High-Alpine Alpine Track",
+            "infrastructureType": "Power Grid Substation",
+            "title": "Snowmelt erosion along Kibber service track",
+            "description": "High-altitude track shoulders are narrowing and emergency vehicle access is now unreliable.",
+            "upvotes": 12,
+            "hours_ago": 20,
+        },
+    ]
+
+    for payload in payloads:
+        department_name = allocate_department_name(payload["infrastructureType"])
+        department = departments[department_name]
+        district = districts[payload["district"]]
+        created_at = now - timedelta(hours=payload["hours_ago"])
+        priority = evaluate_priority(payload["terrainRisk"])
+        if payload["upvotes"] > UPVOTE_CRITICAL_THRESHOLD:
+            priority = "critical"
+        officer = find_assignment_officer(db, department.id, district.id, payload["block"])
+
+        db.add(Grievance(
+            ticket_id=payload["ticket_id"],
+            citizen_id=citizen.id,
+            category_id=subcategories[payload["infrastructureType"]].category_id,
+            subcategory_id=subcategories[payload["infrastructureType"]].id,
+            department_id=department.id,
+            assigned_officer_id=officer.id if officer else None,
+            latitude=decimal_coord(None, payload["district"], 0),
+            longitude=decimal_coord(None, payload["district"], 1),
+            district_id=district.id,
+            district=payload["district"],
+            block=payload["block"],
+            panchayat=payload["panchayat"],
+            terrain_risk=payload["terrainRisk"],
+            infrastructure_type=payload["infrastructureType"],
+            upvotes=payload["upvotes"],
+            title=payload["title"],
+            description=payload["description"],
+            intake_photo_url="",
+            status="Pending",
+            priority=priority,
+            is_flagged_to_cmo=payload["upvotes"] > UPVOTE_CRITICAL_THRESHOLD,
+            sla_due_date=created_at + timedelta(hours=SLA_HOURS_BY_PRIORITY[priority]),
+            created_at=created_at,
+            updated_at=created_at,
+        ))
+
+def find_assignment_officer(db: Session, department_id: int, district_id: Optional[int], block: str) -> Optional[Officer]:
+    location_specific = db.query(Officer).filter(
+        Officer.department_id == department_id,
+        Officer.service_district_id == district_id,
+        Officer.block == block,
+        Officer.role == "Officer",
+        Officer.is_active.is_(True),
+    ).order_by(Officer.id.asc()).first()
+    if location_specific is not None:
+        return location_specific
+
+    return db.query(Officer).filter(
+        Officer.department_id == department_id,
+        Officer.role == "Officer",
+        Officer.is_active.is_(True),
+    ).order_by(Officer.id.asc()).first()
 
 def generate_ticket_id(department_code: str, now: datetime) -> str:
-    safe_code = re.sub(r"[^A-Z0-9]", "", department_code.upper())[:5]
-    code = safe_code or "GEN"
-    return f"DL-{now:%Y}-{code}-{now:%m%d%H%M%S%f}"
+    safe_code = re.sub(r"[^A-Z0-9]", "", department_code.upper())[:6]
+    return f"HP-{now:%Y}-{safe_code or 'HP'}-{now:%m%d%H%M%S%f}"
 
-
-def ensure_unique_ticket_id(
-    db: Session,
-    department_code: str,
-) -> tuple[str, datetime]:
+def ensure_unique_ticket_id(db: Session, department_code: str) -> tuple[str, datetime]:
     for _ in range(5):
         now = utc_now()
         ticket_id = generate_ticket_id(department_code, now)
-        exists = (
-            db.query(Grievance.id)
-            .filter(Grievance.ticket_id == ticket_id)
-            .first()
-        )
+        exists = db.query(Grievance.id).filter(Grievance.ticket_id == ticket_id).first()
         if not exists:
             return ticket_id, now
-
     raise HTTPException(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         detail="Unable to generate a unique grievance ticket id.",
     )
 
+def decimal_coord(value: Optional[float], district: str, index: int) -> Optional[Decimal]:
+    if value is not None:
+        return Decimal(f"{value:.6f}")
+    fallback = DEFAULT_COORDINATES_BY_DISTRICT.get(district)
+    if fallback is None:
+        return None
+    return Decimal(f"{fallback[index]:.6f}")
 
-# =====================================================================
-# PHASE 1: AUTHENTICATION ROUTERS (MOCKED FLOWS MATCHING APP.JSX)
-# =====================================================================
+def apply_upvote_promotion(grievance: Grievance) -> bool:
+    if int(grievance.upvotes or 0) > UPVOTE_CRITICAL_THRESHOLD:
+        changed = enum_value(grievance.priority) != "critical"
+        grievance.priority = "critical"
+        grievance.is_flagged_to_cmo = True
+        return changed
+    return False
 
+def promote_high_upvote_tickets(db: Session) -> None:
+    promoted = False
+    tickets = db.query(Grievance).filter(Grievance.upvotes > UPVOTE_CRITICAL_THRESHOLD).all()
+    for ticket in tickets:
+        promoted = apply_upvote_promotion(ticket) or promoted
+    if promoted:
+        db.commit()
 
-@app.post("/api/v1/auth/otp", status_code=status.HTTP_200_OK)
-def citizen_otp_login(
-    payload: OTPLoginRequest,
-    db: Session = Depends(get_db),
-) -> Dict[str, Any]:
-    """Validates citizen OTP logins with the evaluator bypass OTP."""
-    if payload.otp != "1234":
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid security credentials / incorrect OTP token entered.",
-        )
+def calculate_composite_score(grievance: Grievance) -> int:
+    priority = enum_value(grievance.priority)
+    return (
+        (60 if priority == "critical" else 20)
+        + int(grievance.upvotes or 0) * 2
+        + (15 if grievance.terrain_risk == "Flash Flood Khud Proximity" else 0)
+    )
 
-    citizen = db.query(Citizen).filter(Citizen.phone == payload.phone).first()
-    if citizen is None:
-        citizen = Citizen(
-            name="Evaluator Account",
-            phone=payload.phone,
-            otp_hash="mocked_otp_bypass_hash",
-        )
+def serialize_grievance(grievance: Grievance) -> GrievanceResponse:
+    return GrievanceResponse(
+        id=grievance.id,
+        ticket_id=grievance.ticket_id,
+        title=grievance.title,
+        description=grievance.description,
+        district=grievance.district,
+        block=grievance.block,
+        panchayat=grievance.panchayat,
+        upvotes=int(grievance.upvotes or 0),
+        terrainRisk=grievance.terrain_risk,
+        infrastructureType=grievance.infrastructure_type,
+        department=grievance.department.name,
+        status=enum_value(grievance.status),
+        priority=enum_value(grievance.priority),
+        sla_due_date=grievance.sla_due_date,
+        created_at=grievance.created_at,
+        resolved_at=grievance.resolved_at,
+        resolutionNotes=grievance.resolution_notes,
+        validationImageUrl=grievance.resolution_photo_url,
+    )
+
+def run_sla_compliance_monitor() -> None:
+    while True:
+        from database import SessionLocal
+        worker_db = SessionLocal()
         try:
-            db.add(citizen)
-            db.commit()
-            db.refresh(citizen)
-        except SQLAlchemyError as exc:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to create evaluator citizen account.",
-            ) from exc
+            now = utc_now()
+            breached_tickets = worker_db.query(Grievance).filter(
+                Grievance.status.in_(ACTIVE_STATUSES),
+                Grievance.sla_due_date < now,
+                Grievance.is_escalated_to_dm.is_(False),
+            ).all()
 
+            for ticket in breached_tickets:
+                previous_status = enum_value(ticket.status)
+                ticket.is_escalated_to_dm = True
+                ticket.priority = "critical"
+                ticket.is_flagged_to_cmo = True
+
+                worker_db.add(GrievanceLog(
+                    grievance_id=ticket.id,
+                    previous_status=previous_status,
+                    new_status=previous_status,
+                    remarks="System Automation Hook: mountain window SLA breached. Escalated to District Magistrate.",
+                    action_by_officer_id=ticket.assigned_officer_id,
+                ))
+                worker_db.add(Notification(
+                    grievance_id=ticket.id,
+                    recipient_type="District Magistrate",
+                    channel="Email",
+                    message=f"SLA breach alert for ticket {ticket.ticket_id}. Command review required.",
+                ))
+            worker_db.commit()
+        except Exception as monitor_err:
+            print(f"Background monitoring worker error encountered: {monitor_err}")
+            worker_db.rollback()
+        finally:
+            worker_db.close()
+        time.sleep(SLA_MONITOR_INTERVAL_SECONDS)
+
+@app.on_event("startup")
+def start_sla_compliance_monitor() -> None:
+    global sla_monitor_thread
+    bootstrap_database()
+    if sla_monitor_thread and sla_monitor_thread.is_alive():
+        return
+    sla_monitor_thread = threading.Thread(target=run_sla_compliance_monitor, daemon=True)
+    sla_monitor_thread.start()
+
+@app.get("/health")
+def health_check() -> Dict[str, str]:
     return {
-        "success": True,
-        "user_id": citizen.id,
-        "role": "Citizen",
-        "token": "mocked_jwt_token_hash",
+        "status": "ok",
+        "municipal_region": MUNICIPAL_REGION,
+        "monsoon_command_state": MONSOON_COMMAND_STATE,
     }
-
 
 @app.post("/api/v1/auth/login", status_code=status.HTTP_200_OK)
 def staff_and_executive_login(
     payload: StaffLoginRequest,
     db: Session = Depends(get_db),
 ) -> Dict[str, Any]:
-    """Authenticates staff users via explicit officer email lookups."""
     officer = db.query(Officer).filter(Officer.email == payload.email).first()
-    if officer is None or payload.password != "password":
+    
+    if officer is None or not verify_password(payload.password, officer.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid administrative username or password configuration.",
@@ -429,213 +686,68 @@ def staff_and_executive_login(
         "token": "mocked_staff_jwt_token_hash",
     }
 
+@app.get("/api/grievances", response_model=List[GrievanceResponse])
+def list_grievances(db: Session = Depends(get_db)) -> List[GrievanceResponse]:
+    promote_high_upvote_tickets(db)
+    tickets = db.query(Grievance).order_by(Grievance.created_at.desc()).all()
+    return [serialize_grievance(ticket) for ticket in tickets]
 
-# =====================================================================
-# PHASE 1: OPERATIONAL & QUEUE DATA RETRIEVAL ROUTERS
-# =====================================================================
-
-
-@app.get(
-    "/api/v1/grievances/{ticket_id}",
-    response_model=GrievanceDetailResponse,
-)
-def get_grievance_by_id(
-    ticket_id: str,
+@app.post("/api/grievances", response_model=GrievanceResponse, status_code=status.HTTP_201_CREATED)
+def create_grievance(
+    title: str = Form(...),
+    description: str = Form(...),
+    district: str = Form(...),
+    block: str = Form(...),
+    panchayat: str = Form(...),
+    terrainRisk: str = Form(...),
+    infrastructureType: str = Form(...),
+    latitude: Optional[float] = Form(None),
+    longitude: Optional[float] = Form(None),
+    citizenId: Optional[int] = Form(None),
     db: Session = Depends(get_db),
-) -> GrievanceDetailResponse:
-    """Fetches full transaction metadata for targeted grievance tracking."""
-    record = (
-        db.query(Grievance)
-        .filter(Grievance.ticket_id == ticket_id)
-        .first()
-    )
-    if record is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Requested grievance ticket does not exist.",
-        )
+) -> GrievanceResponse:
+    """Safe, robust multipart endpoint aligned to your true database schemas."""
+    title = require_non_empty(title, "title")
+    description = require_non_empty(description, "description")
+    validate_location_hierarchy(district, block, panchayat)
 
-    district_name = (
-        db.query(District.name)
-        .filter(District.id == record.district_id)
-        .scalar()
-        or "Unknown"
-    )
-    ward_name = (
-        db.query(Ward.name)
-        .filter(Ward.id == record.ward_id)
-        .scalar()
-        or "Unknown"
-    )
-    department_name = (
-        db.query(Department.name)
-        .filter(Department.id == record.department_id)
-        .scalar()
-        or "Unknown"
-    )
-
-    return GrievanceDetailResponse(
-        id=record.id,
-        ticket_id=record.ticket_id,
-        title=record.title,
-        description=record.description,
-        status=enum_value(record.status),
-        priority=enum_value(record.priority),
-        latitude=float(record.latitude),
-        longitude=float(record.longitude),
-        sla_due_date=record.sla_due_date,
-        created_at=record.created_at,
-        resolved_at=record.resolved_at,
-        resolution_notes=record.resolution_notes,
-        resolution_photo_url=record.resolution_photo_url,
-        district_name=district_name,
-        ward_name=ward_name,
-        department_name=department_name,
-    )
-
-
-@app.get(
-    "/api/v1/officer/{officer_id}/queue",
-    response_model=List[OfficerQueueResponse],
-)
-def get_officer_work_queue(
-    officer_id: int,
-    db: Session = Depends(get_db),
-) -> List[OfficerQueueResponse]:
-    """Returns active unresolved tasks assigned to a ground officer."""
-    tickets = (
-        db.query(Grievance)
-        .filter(
-            Grievance.assigned_officer_id == officer_id,
-            Grievance.status.in_(ACTIVE_STATUSES),
-        )
-        .order_by(Grievance.sla_due_date.asc())
-        .all()
-    )
-
-    return [
-        OfficerQueueResponse(
-            ticket_id=ticket.ticket_id,
-            title=ticket.title,
-            priority=enum_value(ticket.priority),
-            sla_due_date=ticket.sla_due_date,
-            status=enum_value(ticket.status),
-        )
-        for ticket in tickets
-    ]
-
-
-@app.post(
-    "/api/v1/grievances/intake",
-    response_model=GrievanceIntakeResponse,
-    status_code=status.HTTP_201_CREATED,
-)
-def intake_grievance(
-    payload: GrievanceIntakeRequest,
-    db: Session = Depends(get_db),
-) -> GrievanceIntakeResponse:
-    title = require_non_empty(payload.title, "title")
-    description = require_non_empty(payload.description, "description")
-
-    subcategory = (
-        db.query(Subcategory)
-        .filter(Subcategory.id == payload.subcategory_id)
-        .first()
-    )
-    if subcategory is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Subcategory not found.",
-        )
-
-    department = (
-        db.query(Department)
-        .filter(Department.id == subcategory.department_id)
-        .first()
-    )
-    if department is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Subcategory is not linked to a valid department.",
-        )
-
-    citizen_exists = (
-        db.query(Citizen.id)
-        .filter(Citizen.id == payload.citizen_id)
-        .first()
-    )
-    if citizen_exists is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Citizen not found.",
-        )
-
-    ward = (
-        db.query(Ward)
-        .filter(
-            Ward.id == payload.ward_id,
-            Ward.district_id == payload.district_id,
-        )
-        .first()
-    )
-    if ward is None:
-        raise HTTPException(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail="Ward does not belong to the supplied district.",
-        )
-
-    officer = (
-        db.query(Officer)
-        .filter(
-            Officer.department_id == subcategory.department_id,
-            Officer.ward_id == payload.ward_id,
-            Officer.role == "Officer",
-            Officer.is_active.is_(True),
-        )
-        .order_by(Officer.id.asc())
-        .first()
-    )
-    if officer is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="No active ward officer is available for this department.",
-        )
-
-    ticket_id, now = ensure_unique_ticket_id(db, department.code)
-    duplicate_count = nearby_active_duplicate_count(
+    priority = evaluate_priority(terrainRisk)
+    department_name = allocate_department_name(infrastructureType)
+    department = get_or_create_department(db, department_name)
+    district_obj = get_or_create_district(db, district)
+    
+    officer = find_assignment_officer(
         db=db,
-        subcategory_id=payload.subcategory_id,
-        latitude=payload.latitude,
-        longitude=payload.longitude,
-        now=now,
+        department_id=department.id,
+        district_id=district_obj.id,
+        block=block,
     )
-
-    priority = enum_value(subcategory.base_priority)
-    if duplicate_count:
-        priority = elevate_priority(priority)
-
-    is_flagged_to_cmo = duplicate_count >= LOCAL_SURGE_THRESHOLD
-    if is_flagged_to_cmo:
-        priority = elevate_priority(priority)
-
+    citizen = db.query(Citizen).filter(Citizen.id == citizenId).first() if citizenId else None
+    ticket_id, now = ensure_unique_ticket_id(db, department.code)
+    
     grievance = Grievance(
         ticket_id=ticket_id,
-        citizen_id=payload.citizen_id,
-        category_id=subcategory.category_id,
-        subcategory_id=subcategory.id,
-        department_id=subcategory.department_id,
-        assigned_officer_id=officer.id,
-        latitude=payload.latitude,
-        longitude=payload.longitude,
-        district_id=payload.district_id,
-        ward_id=payload.ward_id,
+        citizen_id=citizen.id if citizen else None,
+        department_id=department.id,
+        assigned_officer_id=officer.id if officer else None,
+        latitude=decimal_coord(latitude, district, 0),
+        longitude=decimal_coord(longitude, district, 1),
+        district_id=district_obj.id,
+        district=district,
+        block=block,
+        panchayat=panchayat,
+        terrain_risk=terrainRisk,
+        infrastructure_type=infrastructureType,
+        upvotes=0,
         title=title,
         description=description,
-        intake_photo_url=(payload.intake_photo_url or "").strip(),
+        intake_photo_url="",
         status="Pending",
         priority=priority,
-        is_flagged_to_cmo=is_flagged_to_cmo,
-        sla_due_date=now + timedelta(days=subcategory.sla_days or 3),
+        is_flagged_to_cmo=False,
+        sla_due_date=now + timedelta(hours=SLA_HOURS_BY_PRIORITY[priority]),
+        created_at=now,
+        updated_at=now,
     )
 
     try:
@@ -646,50 +758,40 @@ def intake_grievance(
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to create grievance ticket.",
+            detail="Failed to commit grievance data record.",
         ) from exc
 
-    return GrievanceIntakeResponse(
-        ticket_id=grievance.ticket_id,
-        status=enum_value(grievance.status),
-        priority=enum_value(grievance.priority),
-        assigned_officer_id=grievance.assigned_officer_id,
-        sla_due_date=grievance.sla_due_date,
-        duplicate_detected=duplicate_count > 0,
-        nearby_duplicate_count=duplicate_count,
-        is_flagged_to_cmo=grievance.is_flagged_to_cmo,
-    )
+    return serialize_grievance(grievance)
 
+@app.post("/api/grievances/{ticket_id}/upvote", response_model=GrievanceResponse)
+def upvote_grievance(ticket_id: str, db: Session = Depends(get_db)) -> GrievanceResponse:
+    grievance = db.query(Grievance).filter(Grievance.ticket_id == ticket_id).with_for_update().first()
+    if grievance is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grievance profile lookup failure.")
 
-@app.post(
-    "/api/v1/grievances/{ticket_id}/resolve",
-    response_model=GrievanceResolveResponse,
-)
+    grievance.upvotes = int(grievance.upvotes or 0) + 1
+    apply_upvote_promotion(grievance)
+
+    try:
+        db.commit()
+        db.refresh(grievance)
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upvote transaction commit error.") from exc
+    return serialize_grievance(grievance)
+
+@app.post("/api/grievances/{ticket_id}/resolve", response_model=GrievanceResolveResponse)
 def resolve_grievance(
     ticket_id: str,
     payload: GrievanceResolveRequest,
     db: Session = Depends(get_db),
 ) -> GrievanceResolveResponse:
-    resolution_notes = require_non_empty(
-        payload.resolution_notes,
-        "resolution_notes",
-    )
-    resolution_photo_url = require_non_empty(
-        payload.resolution_photo_url,
-        "resolution_photo_url",
-    )
+    resolution_notes = require_non_empty(payload.resolutionNotes, "resolutionNotes")
+    validation_image_url = require_non_empty(payload.validationImageUrl, "validationImageUrl")
 
-    grievance = (
-        db.query(Grievance)
-        .filter(Grievance.ticket_id == ticket_id)
-        .with_for_update()
-        .first()
-    )
+    grievance = db.query(Grievance).filter(Grievance.ticket_id == ticket_id).with_for_update().first()
     if grievance is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Grievance ticket not found.",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Grievance ticket not found.")
 
     previous_status = enum_value(grievance.status)
     if previous_status not in ACTIVE_STATUSES:
@@ -698,43 +800,19 @@ def resolve_grievance(
             detail=f"Ticket cannot be resolved from {previous_status} status.",
         )
 
-    officer = (
-        db.query(Officer)
-        .filter(
-            Officer.id == payload.officer_id,
-            Officer.is_active.is_(True),
-        )
-        .first()
-    )
-    if officer is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Active officer not found.",
-        )
-
-    officer_role = enum_value(officer.role)
-    elevated_roles = {"Supervisor", "District Magistrate", "CMO_Monitor"}
-    if (
-        officer.id != grievance.assigned_officer_id
-        and officer_role not in elevated_roles
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only the assigned officer or an elevated role can resolve.",
-        )
-
+    action_by_officer_id = payload.officerId or grievance.assigned_officer_id
     now = utc_now()
-    grievance.status = "Resolved"
+    grievance.status = "Verified Resolved"
     grievance.resolved_at = now
     grievance.resolution_notes = resolution_notes
-    grievance.resolution_photo_url = resolution_photo_url
+    grievance.resolution_photo_url = validation_image_url
 
     log = GrievanceLog(
         grievance_id=grievance.id,
         previous_status=previous_status,
-        new_status="Resolved",
+        new_status="Verified Resolved",
         remarks=resolution_notes,
-        action_by_officer_id=payload.officer_id,
+        action_by_officer_id=action_by_officer_id,
     )
 
     try:
@@ -757,42 +835,19 @@ def resolve_grievance(
         log_id=log.id,
     )
 
-
-@app.post(
-    "/api/v1/grievances/{ticket_id}/reopen",
-    response_model=GrievanceReopenResponse,
-)
-def reopen_grievance(
-    ticket_id: str,
-    payload: GrievanceReopenRequest,
-    db: Session = Depends(get_db),
-) -> GrievanceReopenResponse:
+@app.post("/api/grievances/{ticket_id}/reopen", response_model=GrievanceReopenResponse)
+def reopen_grievance(ticket_id: str, payload: GrievanceReopenRequest, db: Session = Depends(get_db)) -> GrievanceReopenResponse:
     remarks = require_non_empty(payload.remarks, "remarks")
-
-    grievance = (
-        db.query(Grievance)
-        .filter(Grievance.ticket_id == ticket_id)
-        .with_for_update()
-        .first()
-    )
+    grievance = db.query(Grievance).filter(Grievance.ticket_id == ticket_id).with_for_update().first()
     if grievance is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Grievance ticket not found.",
-        )
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ticket signature mismatch.")
 
     previous_status = enum_value(grievance.status)
-    if previous_status != "Resolved":
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="Only resolved tickets can be reopened.",
-        )
-
     now = utc_now()
     grievance.status = "Reopened"
-    grievance.reopened_count = (grievance.reopened_count or 0) + 1
+    grievance.reopened_count = int(grievance.reopened_count or 0) + 1
     grievance.is_escalated_to_supervisor = True
-    grievance.sla_due_date = now + timedelta(hours=48)
+    grievance.sla_due_date = now + timedelta(hours=24)
 
     log = GrievanceLog(
         grievance_id=grievance.id,
@@ -809,10 +864,7 @@ def reopen_grievance(
         db.refresh(grievance)
     except SQLAlchemyError as exc:
         db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to reopen grievance ticket.",
-        ) from exc
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to stage veto update.") from exc
 
     return GrievanceReopenResponse(
         ticket_id=grievance.ticket_id,
@@ -824,131 +876,57 @@ def reopen_grievance(
         log_id=log.id,
     )
 
-
-@app.get("/api/v1/admin/executive-alerts")
+@app.get("/api/admin/executive-alerts")
 def executive_alerts(db: Session = Depends(get_db)) -> Dict[str, Any]:
+    promote_high_upvote_tickets(db)
     metric_row = db.query(
-        func.count(Grievance.id).label("total_complaints"),
-        func.count(Grievance.id)
-        .filter(Grievance.status == "Pending")
-        .label("pending_count"),
-        func.count(Grievance.id)
-        .filter(Grievance.status == "In Progress")
-        .label("in_progress_count"),
-        func.count(Grievance.id)
-        .filter(Grievance.status == "Resolved")
-        .label("resolved_count"),
-        func.count(Grievance.id)
-        .filter(Grievance.status == "Reopened")
-        .label("reopened_count"),
+        func.count(Grievance.id).label("total_grievances"),
+        func.count(Grievance.id).filter(Grievance.status.in_(ACTIVE_STATUSES)).label("active_pending"),
+        func.count(Grievance.id).filter(Grievance.status == "Verified Resolved").label("verified_resolved"),
+        func.count(Grievance.id).filter(Grievance.upvotes > UPVOTE_CRITICAL_THRESHOLD).label("high_upvote_emergencies"),
     ).one()
 
-    alerts: List[str] = []
-    alert_details: List[Dict[str, Any]] = []
-    seven_days_ago = utc_now() - timedelta(days=7)
+    district_rows = db.query(
+        Grievance.district,
+        func.count(Grievance.id).label("total"),
+        func.count(Grievance.id).filter(Grievance.upvotes > UPVOTE_CRITICAL_THRESHOLD).label("high_upvote"),
+        func.count(Grievance.id).filter(Grievance.terrain_risk == "Landslide Vulnerable Link").label("landslide"),
+        func.count(Grievance.id).filter(Grievance.infrastructure_type == "Connecting Bailey Bridge").label("bailey_bridge"),
+    ).group_by(Grievance.district).order_by(func.count(Grievance.id).desc()).all()
 
-    cluster_rows = (
-        db.query(
-            Grievance.ward_id,
-            Ward.name.label("ward_name"),
-            Grievance.subcategory_id,
-            Subcategory.name.label("subcategory_name"),
-            func.count(Grievance.id).label("active_count"),
-        )
-        .join(Ward, Ward.id == Grievance.ward_id)
-        .join(Subcategory, Subcategory.id == Grievance.subcategory_id)
-        .filter(
-            Grievance.status.in_(ACTIVE_STATUSES),
-            Grievance.created_at >= seven_days_ago,
-        )
-        .group_by(
-            Grievance.ward_id,
-            Ward.name,
-            Grievance.subcategory_id,
-            Subcategory.name,
-        )
-        .having(func.count(Grievance.id) >= 50)
-        .all()
-    )
+    alert_details = []
+    high_risk_tickets = db.query(Grievance).filter(
+        Grievance.status.in_(ACTIVE_STATUSES),
+        ((Grievance.upvotes > UPVOTE_CRITICAL_THRESHOLD) | (Grievance.priority == "critical") | (Grievance.sla_due_date < func.now())),
+    ).order_by(Grievance.upvotes.desc(), Grievance.sla_due_date.asc()).limit(8).all()
 
-    for row in cluster_rows:
-        message = (
-            "Geographic cluster surge: "
-            f"{row.active_count} active {row.subcategory_name} complaints "
-            f"were filed in ward {row.ward_name} over the last 7 days."
-        )
-        alerts.append(message)
-        alert_details.append(
-            {
-                "type": "geographic_cluster_surge",
-                "severity": "high",
-                "message": message,
-                "ward_id": row.ward_id,
-                "ward_name": row.ward_name,
-                "subcategory_id": row.subcategory_id,
-                "subcategory_name": row.subcategory_name,
-                "active_count": row.active_count,
-            }
-        )
-
-    department_rows = (
-        db.query(
-            Department.id.label("department_id"),
-            Department.name.label("department_name"),
-            Department.code.label("department_code"),
-            func.count(Grievance.id).label("active_count"),
-            func.count(Grievance.id)
-            .filter(Grievance.sla_due_date < func.now())
-            .label("overdue_count"),
-        )
-        .join(Grievance, Grievance.department_id == Department.id)
-        .filter(Grievance.status.in_(ACTIVE_STATUSES))
-        .group_by(Department.id, Department.name, Department.code)
-        .having(func.count(Grievance.id) > 0)
-        .all()
-    )
-
-    for row in department_rows:
-        active_count = int(row.active_count or 0)
-        overdue_count = int(row.overdue_count or 0)
-        compliant_count = active_count - overdue_count
-        compliance_rate = (
-            compliant_count / active_count
-            if active_count
-            else 1
-        )
-
-        if compliance_rate < 0.60:
-            message = (
-                "Administrative SLA breach: "
-                f"{row.department_name} compliance is "
-                f"{compliance_rate:.0%} with {overdue_count} overdue "
-                f"active tickets."
-            )
-            alerts.append(message)
-            alert_details.append(
-                {
-                    "type": "administrative_sla_breach",
-                    "severity": "critical",
-                    "message": message,
-                    "department_id": row.department_id,
-                    "department_name": row.department_name,
-                    "department_code": row.department_code,
-                    "active_count": active_count,
-                    "overdue_count": overdue_count,
-                    "compliance_rate": round(compliance_rate, 4),
-                }
-            )
+    for ticket in high_risk_tickets:
+        alert_details.append({
+            "type": "monsoon_infrastructure_escalation",
+            "severity": enum_value(ticket.priority),
+            "message": f"{ticket.district} / {ticket.block}: {ticket.title} has {ticket.upvotes} upvotes.",
+            "ticket_id": ticket.ticket_id,
+            "district": ticket.district,
+            "block": ticket.block,
+            "panchayat": ticket.panchayat,
+            "upvotes": ticket.upvotes,
+            "terrainRisk": ticket.terrain_risk,
+            "infrastructureType": ticket.infrastructure_type,
+            "compositeScore": calculate_composite_score(ticket),
+        })
 
     return {
         "generated_at": utc_now(),
         "metrics": {
-            "total_complaints": metric_row.total_complaints,
-            "pending_count": metric_row.pending_count,
-            "in_progress_count": metric_row.in_progress_count,
-            "resolved_count": metric_row.resolved_count,
-            "reopened_count": metric_row.reopened_count,
+            "total_grievances": metric_row.total_grievances,
+            "high_upvote_emergencies": metric_row.high_upvote_emergencies,
+            "active_pending": metric_row.active_pending,
+            "verified_resolved": metric_row.verified_resolved,
         },
-        "alerts": alerts,
+        "district_load": [
+            {"district": r.district, "total": int(r.total or 0), "high_upvote": int(r.high_upvote or 0), "landslide_or_bridge": int(r.landslide or 0) + int(r.bailey_bridge or 0)}
+            for r in district_rows
+        ],
+        "alerts": [item["message"] for item in alert_details],
         "alert_details": alert_details,
     }

@@ -10,6 +10,15 @@
     }
   }
 
+  @keyframes ticker-scroll {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+
   .animate-in {
     animation-name: enter;
     animation-duration: 150ms;
@@ -21,7 +30,18 @@
     --tw-enter-opacity: 0;
   }
 
+  .ticker-track {
+    width: max-content;
+    animation: ticker-scroll 38s linear infinite;
+  }
+
   .zoom-in-95 {
     --tw-enter-scale: 0.95;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .ticker-track {
+      animation: none;
+    }
   }
 }

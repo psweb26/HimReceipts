@@ -8,7 +8,6 @@ from sqlalchemy import (
     Numeric,
     String,
     Text,
-    UniqueConstraint,
     event,
     func,
     text,
@@ -21,8 +20,9 @@ from database import Base
 
 post_status_enum = ENUM(
     "Pending",
+    "Under Verification",
     "In Progress",
-    "Resolved",
+    "Verified Resolved",
     "Reopened",
     "Rejected",
     name="post_status",
@@ -30,10 +30,10 @@ post_status_enum = ENUM(
 )
 
 post_priority_enum = ENUM(
-    "Low",
-    "Medium",
-    "High",
-    "Critical",
+    "low",
+    "medium",
+    "high",
+    "critical",
     name="post_priority",
     validate_strings=True,
 )
@@ -62,31 +62,8 @@ class District(Base):
     id = Column(Integer, primary_key=True)
     name = Column(String, unique=True, nullable=False)
 
-    wards = relationship("Ward", back_populates="district")
-    grievances = relationship("Grievance", back_populates="district")
-
-
-class Ward(Base):
-    __tablename__ = "wards"
-    __table_args__ = (
-        UniqueConstraint(
-            "district_id",
-            "name",
-            name="uq_wards_district_id_name",
-        ),
-    )
-
-    id = Column(Integer, primary_key=True)
-    district_id = Column(
-        Integer,
-        ForeignKey("districts.id"),
-        nullable=False,
-    )
-    name = Column(String, nullable=False)
-
-    district = relationship("District", back_populates="wards")
-    officers = relationship("Officer", back_populates="ward")
-    grievances = relationship("Grievance", back_populates="ward")
+    officers = relationship("Officer", back_populates="service_district")
+    grievances = relationship("Grievance", back_populates="district_record")
 
 
 class Department(Base):
@@ -126,10 +103,10 @@ class Subcategory(Base):
         nullable=False,
     )
     name = Column(String, nullable=False)
-    sla_days = Column(
+    sla_hours = Column(
         Integer,
         nullable=False,
-        server_default=text("3"),
+        server_default=text("72"),
     )
     base_priority = Column(post_priority_enum, nullable=False)
 
@@ -159,7 +136,12 @@ class Officer(Base):
         ForeignKey("departments.id"),
         nullable=False,
     )
-    ward_id = Column(Integer, ForeignKey("wards.id"), nullable=False)
+    service_district_id = Column(
+        Integer,
+        ForeignKey("districts.id"),
+        nullable=True,
+    )
+    block = Column(String, nullable=True)
     role = Column(
         post_role_enum,
         nullable=False,
@@ -174,7 +156,7 @@ class Officer(Base):
     )
 
     department = relationship("Department", back_populates="officers")
-    ward = relationship("Ward", back_populates="officers")
+    service_district = relationship("District", back_populates="officers")
     assigned_grievances = relationship(
         "Grievance",
         back_populates="assigned_officer",
@@ -189,21 +171,25 @@ class Grievance(Base):
     __tablename__ = "grievances"
     __table_args__ = (
         Index("ix_grievances_status", "status"),
+        Index("ix_grievances_priority", "priority"),
         Index("ix_grievances_sla_due_date", "sla_due_date"),
-        Index("ix_grievances_ward_id", "ward_id"),
+        Index("ix_grievances_district", "district"),
+        Index("ix_grievances_block", "block"),
+        Index("ix_grievances_terrain_risk", "terrain_risk"),
         Index("ix_grievances_department_id", "department_id"),
         Index("ix_grievances_assigned_officer_id", "assigned_officer_id"),
+        Index("ix_grievances_upvotes", "upvotes"),
         Index("ix_grievances_created_at", "created_at"),
     )
 
     id = Column(Integer, primary_key=True)
-    ticket_id = Column(String(30), unique=True, index=True, nullable=False)
-    citizen_id = Column(Integer, ForeignKey("citizens.id"), nullable=False)
-    category_id = Column(Integer, ForeignKey("categories.id"), nullable=False)
+    ticket_id = Column(String(40), unique=True, index=True, nullable=False)
+    citizen_id = Column(Integer, ForeignKey("citizens.id"), nullable=True)
+    category_id = Column(Integer, ForeignKey("categories.id"), nullable=True)
     subcategory_id = Column(
         Integer,
         ForeignKey("subcategories.id"),
-        nullable=False,
+        nullable=True,
     )
     department_id = Column(
         Integer,
@@ -213,15 +199,24 @@ class Grievance(Base):
     assigned_officer_id = Column(
         Integer,
         ForeignKey("officers.id"),
-        nullable=False,
+        nullable=True,
     )
-    latitude = Column(Numeric(9, 6), nullable=False)
-    longitude = Column(Numeric(9, 6), nullable=False)
-    district_id = Column(Integer, ForeignKey("districts.id"), nullable=False)
-    ward_id = Column(Integer, ForeignKey("wards.id"), nullable=False)
+    latitude = Column(Numeric(9, 6), nullable=True)
+    longitude = Column(Numeric(9, 6), nullable=True)
+    district_id = Column(Integer, ForeignKey("districts.id"), nullable=True)
+    district = Column(String, nullable=False)
+    block = Column(String, nullable=False)
+    panchayat = Column(String, nullable=False)
+    terrain_risk = Column(String, nullable=False)
+    infrastructure_type = Column(String, nullable=False)
+    upvotes = Column(
+        Integer,
+        nullable=False,
+        server_default=text("0"),
+    )
     title = Column(String(150), nullable=False)
     description = Column(Text, nullable=False)
-    intake_photo_url = Column(String(255), nullable=False)
+    intake_photo_url = Column(String(255), nullable=False, server_default="")
     status = Column(
         post_status_enum,
         nullable=False,
@@ -230,7 +225,7 @@ class Grievance(Base):
     priority = Column(
         post_priority_enum,
         nullable=False,
-        server_default=text("'Medium'"),
+        server_default=text("'medium'"),
     )
     is_escalated_to_supervisor = Column(
         Boolean,
@@ -275,8 +270,7 @@ class Grievance(Base):
         "Officer",
         back_populates="assigned_grievances",
     )
-    district = relationship("District", back_populates="grievances")
-    ward = relationship("Ward", back_populates="grievances")
+    district_record = relationship("District", back_populates="grievances")
     logs = relationship("GrievanceLog", back_populates="grievance")
     notifications = relationship("Notification", back_populates="grievance")
 
@@ -296,7 +290,7 @@ class GrievanceLog(Base):
     action_by_officer_id = Column(
         Integer,
         ForeignKey("officers.id"),
-        nullable=False,
+        nullable=True,
     )
     changed_at = Column(
         TIMESTAMP(timezone=False),
@@ -320,7 +314,7 @@ class Notification(Base):
         ForeignKey("grievances.id"),
         nullable=False,
     )
-    recipient_type = Column(String(20), nullable=False)
+    recipient_type = Column(String(30), nullable=False)
     channel = Column(comm_channel_enum, nullable=False)
     message = Column(Text, nullable=False)
     sent_at = Column(

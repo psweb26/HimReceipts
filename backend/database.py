@@ -6,7 +6,7 @@ from sqlalchemy.orm import declarative_base, sessionmaker
 
 DEFAULT_DATABASE_URL = (
     "postgresql://gov_admin:SecretGovPassword2026"
-    "@localhost:5432/delhi_accountability"
+    "@localhost:5432/himachal_accountability"
 )
 DATABASE_URL = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
 
