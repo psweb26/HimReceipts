@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from database import Base, SessionLocal, engine, get_db
 from security import hash_password, verify_password
+import models
 from models import (
     Category,
     Citizen,
@@ -27,6 +28,8 @@ from models import (
     Notification,
     Officer,
     Subcategory,
+    TransitRoute,
+    WeatherStation,
 )
 
 MUNICIPAL_REGION = os.getenv("MUNICIPAL_REGION", "HIMACHAL_PRADESH")
@@ -36,7 +39,7 @@ UPVOTE_CRITICAL_THRESHOLD = 30
 ACTIVE_STATUSES = ("Pending", "Under Verification", "In Progress", "Reopened via Citizen Veto")
 SLA_MONITOR_INTERVAL_SECONDS = 60
 
-HIMAMACHAL_ADMIN_HIERARCHY: Dict[str, Dict[str, List[str]]] = {
+HIMACHAL_ADMIN_HIERARCHY: Dict[str, Dict[str, List[str]]] = {
     "Kullu": {
         "Anni": ["Draman", "Kungash", "Lajheri"],
         "Bhuntar": ["Bari", "Sainj", "Jari"],
@@ -195,14 +198,26 @@ class CitizenVetoResponse(BaseModel):
     new_status: str
     veto_id: int
 
+class CulturalSubItem(BaseModel):
+    name: str
+    detail: str
+    spec: str
+    icon: str
+    img: Optional[str] = ""
+
 class CulturalAssetResponse(BaseModel):
-    id: int
-    district: str
-    asset_type: str
+    id: str
+    pillar_category: str
     title: str
     description: str
-    image_url: Optional[str]
-    metadata: Optional[str]
+    specification: str
+    icon: str
+    image_url: Optional[str] = None
+    sub_items: List[CulturalSubItem] = []
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc).replace(tzinfo=None)
@@ -219,11 +234,11 @@ def require_non_empty(value: Optional[str], field_name: str) -> str:
     return value.strip()
 
 def validate_location_hierarchy(district: str, block: str, panchayat: str) -> None:
-    block_map = HIMAMACHAL_ADMIN_HIERARCHY.get(district)
+    block_map = HIMACHAL_ADMIN_HIERARCHY.get(district)
     if block_map is None:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"district must be one of: {', '.join(HIMAMACHAL_ADMIN_HIERARCHY.keys())}.",
+            detail=f"district must be one of: {', '.join(HIMACHAL_ADMIN_HIERARCHY.keys())}.",
         )
 
     panchayats = block_map.get(block)
@@ -360,7 +375,7 @@ def bootstrap_database() -> None:
     try:
         districts = {
             district_name: get_or_create_district(db, district_name)
-            for district_name in HIMAMACHAL_ADMIN_HIERARCHY
+            for district_name in HIMACHAL_ADMIN_HIERARCHY
         }
         departments = {
             department_name: get_or_create_department(db, department_name)
@@ -440,9 +455,6 @@ def bootstrap_database() -> None:
 
         if db.query(Grievance.id).first() is None:
             seed_bootstrap_grievances(db, citizen, districts, departments, subcategories)
-
-        if db.query(CulturalAsset.id).first() is None:
-            seed_cultural_assets(db, districts)
 
         db.commit()
     except Exception:
@@ -546,89 +558,6 @@ def seed_bootstrap_grievances(
             created_at=created_at,
             updated_at=created_at,
         ))
-
-def seed_cultural_assets(db: Session, districts: Dict[str, District]) -> None:
-    """Seed heritage content to fuel daily user engagement."""
-    assets = [
-        # Kullu Dham & Heritage
-        {
-            "district_id": districts["Kullu"].id,
-            "asset_type": "Dham Recipe",
-            "title": "Sepu Badi (Kullu Summer Feast)",
-            "description": "Traditional multi-course feast combining slow-cooked rice, kidney beans, and yogurt curries. Served during monsoon festivals.",
-            "metadata": '{"season": "monsoon", "preparation_hours": 8}',
-        },
-        {
-            "district_id": districts["Kullu"].id,
-            "asset_type": "Handloom Motif",
-            "title": "Kullu Shawl Diamond Cross-Stitch",
-            "description": "Signature geometric diamond lattice pattern found on Kullu shawls, representing mountain peaks and terraced fields.",
-            "metadata": '{"colors": ["crimson", "gold", "indigo"], "stitches_per_inch": 12}',
-        },
-        # Mandi Heritage
-        {
-            "district_id": districts["Mandi"].id,
-            "asset_type": "Dham Recipe",
-            "title": "Mandiyali Khir (Mandi Wedding Rice Pudding)",
-            "description": "Sacred rice pudding slow-cooked with ghee and dry fruits, served at all Mandi ceremonial gatherings.",
-            "metadata": '{"season": "year-round", "primary_ingredient": "basmati rice"}',
-        },
-        {
-            "district_id": districts["Mandi"].id,
-            "asset_type": "Deity Festival",
-            "title": "Baisakhi Dussehra (Spring Deity Assembly)",
-            "description": "Annual gathering of village deities carried through mountain paths. Travel routes close during the festival week.",
-            "metadata": '{"month": "April", "duration_days": 7}',
-        },
-        # Kangra Heritage
-        {
-            "district_id": districts["Kangra"].id,
-            "asset_type": "Handloom Motif",
-            "title": "Kinnauri Cap (Nada) Geometric Embroidery",
-            "description": "Complex geometric spirals and sun-symbols embroidered on traditional Kinnauri ceremonial caps, representing solar cycles.",
-            "metadata": '{"embroidery_type": "chain-stitch", "completion_time_days": 30}',
-        },
-        {
-            "district_id": districts["Kangra"].id,
-            "asset_type": "Deity Festival",
-            "title": "Kullu Dussehra (Mountain Deity Pageant)",
-            "description": "Two-week festival where 200+ village deities travel ceremonial routes. Peak travel disruptions occur mid-October.",
-            "metadata": '{"month": "October", "deity_count": 200}',
-        },
-        # Shimla Heritage
-        {
-            "district_id": districts["Shimla"].id,
-            "asset_type": "Dham Recipe",
-            "title": "Shimla Mash & Dal (Mountain Protein Bowl)",
-            "description": "High-altitude protein dish combining lentils, horse beans, and local herbs. Traditional winter sustenance.",
-            "metadata": '{"altitude_optimized": true, "season": "winter"}',
-        },
-        # Lahaul & Spiti Heritage
-        {
-            "district_id": districts["Lahaul & Spiti"].id,
-            "asset_type": "Dham Recipe",
-            "title": "Spiti Barley Bread & Butter Tea",
-            "description": "High-altitude staple combining barley bread with Himalayan salt butter tea. Essential for extreme weather survival.",
-            "metadata": '{"altitude": "3500m+", "season": "year-round"}',
-        },
-        {
-            "district_id": districts["Lahaul & Spiti"].id,
-            "asset_type": "Deity Festival",
-            "title": "Spiti Monastery Losar (Tibetan New Year)",
-            "description": "High-altitude monastery festival in sub-zero temperatures. Highway closures last 3-4 weeks during celebrations.",
-            "metadata": '{"month": "February", "altitude": "3600m"}',
-        },
-    ]
-
-    for asset_data in assets:
-        asset = CulturalAsset(
-            district_id=asset_data["district_id"],
-            asset_type=asset_data["asset_type"],
-            title=asset_data["title"],
-            description=asset_data["description"],
-            metadata=asset_data.get("metadata"),
-        )
-        db.add(asset)
 
 def find_assignment_officer(db: Session, department_id: int, district_id: Optional[int], block: str) -> Optional[Officer]:
     location_specific = db.query(Officer).filter(
@@ -962,7 +891,6 @@ def file_citizen_veto(
             detail="Citizen veto can only be filed on resolved tickets.",
         )
 
-    # Get or create default citizen for veto
     citizen = db.query(Citizen).filter(Citizen.phone == "9999999999").first()
     
     previous_status = "Verified Resolved"
@@ -1007,24 +935,20 @@ def file_citizen_veto(
     )
 
 @app.get("/api/cultural-assets", response_model=List[CulturalAssetResponse])
-def list_cultural_assets(district: Optional[str] = None, db: Session = Depends(get_db)) -> List[CulturalAssetResponse]:
-    """Fetch heritage content to fuel daily user engagement."""
-    query = db.query(CulturalAsset)
-    
-    if district:
-        query = query.join(District).filter(District.name == district)
-    
-    assets = query.order_by(CulturalAsset.created_at.desc()).all()
-    
+def list_cultural_assets(db: Session = Depends(get_db)) -> List[CulturalAssetResponse]:
+    """Fetch structured heritage content to fuel daily active user carousels."""
+    assets = db.query(models.CulturalAsset).order_by(models.CulturalAsset.id.asc()).all()
     return [
         CulturalAssetResponse(
-            id=asset.id,
-            district=asset.district.name if asset.district else "Unknown",
-            asset_type=enum_value(asset.asset_type),
+            id=str(asset.id),
+            pillar_category=asset.pillar_category,
             title=asset.title,
             description=asset.description,
+            specification=asset.specification,
+            icon=asset.icon,
             image_url=asset.image_url,
-            metadata=asset.metadata,
+            sub_items=asset.sub_items or [],
+            created_at=asset.created_at,
         )
         for asset in assets
     ]
@@ -1083,3 +1007,61 @@ def executive_alerts(db: Session = Depends(get_db)) -> Dict[str, Any]:
         "alerts": [item["message"] for item in alert_details],
         "alert_details": alert_details,
     }
+
+
+# Insert or ensure this block handles calculations correctly without uncommitted flushes:
+
+def compute_multi_factor_status(rain: float, river: float, landslide: bool, debris: bool) -> tuple[str, str]:
+    """Evaluates combined rainfall indices, river surges, and landslide vectors against composite alert thresholds."""
+    r = float(rain)
+    riv = float(river)
+    
+    if r > 100.0 or (r > 80.0 and riv > 2.0) or (r > 70.0 and landslide) or (r > 60.0 and debris):
+        status = "Extreme Cloudburst" if r > 120.0 else "Cloudburst"
+        return status, "Megh-Vipaat"
+    
+    if r > 80.0:
+        return "Severe Rainfall", "Sankat"
+    if r > 50.0:
+        return "Heavy Rain", "Satark"
+    if r > 25.0:
+        return "Moderate Rain", "Satark"
+    if r > 10.0:
+        return "Light Rain", "Nazar"
+    if landslide or debris or riv > 1.0:
+        return "Moderate Rain", "Nazar"
+        
+    return "Normal", "Sthir"
+
+@app.get("/api/telemetry/weather")
+def get_weather_telemetry(db: Session = Depends(get_db)):
+    stations = db.query(WeatherStation).all()
+    payload = []
+    for s in stations:
+        # Calculate transient properties dynamically on the fly
+        status, takri = compute_multi_factor_status(
+            s.rainfall_1hr_mm, s.river_stage_m, s.landslide_sensor_triggered, s.debris_flow_detected
+        )
+        
+        payload.append({
+            "id": s.id,
+            "station_name": s.station_name,
+            "district": s.district,
+            "elevation_m": s.elevation_m,
+            "terrain_type": s.terrain_type,
+            "current_season": s.current_season,
+            "temp_envelope": f"{s.temp_night_floor}°C to {s.temp_day_ceiling}°C",
+            "rainfall_1hr_mm": float(s.rainfall_1hr_mm),
+            "temperature_c": float(s.temperature_c),
+            "river_stage_m": float(s.river_stage_m),
+            "landslide_sensor_triggered": s.landslide_sensor_triggered,
+            "debris_flow_detected": s.debris_flow_detected,
+            "dashboard_status": status,
+            "takri_status_label": takri,
+            "last_ping": s.last_ping.isoformat() if s.last_ping else None
+        })
+    return payload
+
+@app.get("/api/telemetry/transit")
+def get_transit_telemetry(db: Session = Depends(get_db)):
+    return db.query(TransitRoute).order_by(TransitRoute.current_status.asc()).all()

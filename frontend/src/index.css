@@ -3,12 +3,50 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    /* Authentic Regional Design Tokens */
+    --devdar-forest: #1B3B2B;        /* Primary headers, dark backgrounds */
+    --pahadi-crimson: #9E1B2C;       /* Critical alerts, accent CTAs */
+    --spiti-snow: #F5F7FA;           /* Flat backing canvas layout */
+    --dry-wool: #D4C5B3;             /* Structural line dividers, card panels */
+    --kinnaur-marigold: #E29B12;     /* Medium warnings, active state markers */
+    
+    /* Structural Framing Constants (Kath-Kuni Masonry feel) */
+    --kathkuni-radius: 4px;
+    --timber-thick: 5px;
+  }
+
   body {
-    @apply bg-gradient-to-br from-[#f4f3ef] via-[#faf9f7] to-[#f4f3ef];
+    /* Replacing your generic light background tint with an authentic Spiti mountain snow mist gradient */
+    @apply bg-gradient-to-br from-[#F5F7FA] via-[#FAF9F7] to-[#EAECEF] text-slate-800 antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }
 }
 
 @layer utilities {
+  /* Traditional Weave Ribbon (Dynamic geometric strip helper) */
+  .himachali-weave-divider {
+    height: 8px;
+    width: 100%;
+    background-color: var(--pahadi-crimson);
+    background-image: 
+      linear-gradient(45deg, var(--kinnaur-marigold) 25%, transparent 25%), 
+      linear-gradient(-45deg, var(--kinnaur-marigold) 25%, transparent 25%), 
+      linear-gradient(45deg, transparent 75%, var(--devdar-forest) 75%), 
+      linear-gradient(-45deg, transparent 75%, var(--devdar-forest) 75%);
+    background-size: 16px 16px;
+    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  }
+
+  /* Structural Kath-Kuni Layer Panel Layout */
+  .kathkuni-card {
+    background-color: #ffffff;
+    border: 1px solid var(--dry-wool);
+    border-bottom: var(--timber-thick) solid #784A2B; /* Interlocking timber weight effect */
+    border-radius: var(--kathkuni-radius);
+  }
+
+  /* --- Existing Animation Core (Preserved & Maintained) --- */
   @keyframes enter {
     from {
       opacity: var(--tw-enter-opacity, 1);
@@ -17,21 +55,13 @@
   }
 
   @keyframes ticker-scroll {
-    from {
-      transform: translateX(0);
-    }
-    to {
-      transform: translateX(-50%);
-    }
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
   }
 
   @keyframes shimmer {
-    0% {
-      background-position: -1000px 0;
-    }
-    100% {
-      background-position: 1000px 0;
-    }
+    0% { background-position: -1000px 0; }
+    100% { background-position: 1000px 0; }
   }
 
   .animate-in {
@@ -41,35 +71,27 @@
     animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
   }
 
-  .fade-in {
-    --tw-enter-opacity: 0;
-  }
+  .fade-in { --tw-enter-opacity: 0; }
+  .zoom-in-95 { --tw-enter-scale: 0.95; }
 
   .ticker-track {
     width: max-content;
     animation: ticker-scroll 38s linear infinite;
   }
 
-  .zoom-in-95 {
-    --tw-enter-scale: 0.95;
-  }
-
-  .shimmer {
+.shimmer {
     background: linear-gradient(
       90deg,
-      #f4f3ef 25%,
-      #faf9f7 50%,
-      #f4f3ef 75%
+      #F5F7FA 25%,
+      #FAF9F7 50%,
+      #F5F7FA 75% /* 👈 Fixed to percentage */
     );
     background-size: 1000px 100%;
     animation: shimmer 2s infinite;
   }
-
+  
   @media (prefers-reduced-motion: reduce) {
-    .ticker-track {
-      animation: none;
-    }
-    .shimmer {
+    .ticker-track, .shimmer {
       animation: none;
     }
   }

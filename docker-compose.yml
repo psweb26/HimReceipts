@@ -46,7 +46,7 @@ services:
     networks:
       - himachal_network
     volumes:
-      - ./backend:/app/backend
+      - ./backend:/app  
 
   frontend:
     build:
@@ -69,8 +69,9 @@ services:
       - himachal_network
     environment:
       VITE_API_BASE_URL: "http://backend:8000"
-    volumes:
-      - ./frontend:/app/frontend
+    volumes: 
+      - ./frontend:/app
+      - /app/node_modules
 
 networks:
   himachal_network:

@@ -1,8 +1,11 @@
+from datetime import datetime
+
 from sqlalchemy import (
     Boolean,
     Column,
     DDL,
     ForeignKey,
+    DateTime,
     Index,
     Integer,
     Numeric,
@@ -11,6 +14,7 @@ from sqlalchemy import (
     event,
     func,
     text,
+    JSON
 )
 from sqlalchemy.dialects.postgresql import ENUM, TIMESTAMP
 from sqlalchemy.orm import relationship
@@ -314,20 +318,27 @@ class CitizenVeto(Base):
 
 
 class CulturalAsset(Base):
-    """Heritage assets: Dham recipes, handloom motifs, deity festivals."""
+    """Heritage assets registry powering the glassmorphic swipe carousel deck."""
     __tablename__ = "cultural_assets"
 
-    id = Column(Integer, primary_key=True)
+    # Swapped to a String key to easily map clean semantic IDs (e.g., 'CAT-01', 'CAT-02')
+    id = Column(String(50), primary_key=True, index=True)
+    
     district_id = Column(
         Integer,
         ForeignKey("districts.id"),
-        nullable=False,
+        nullable=True, # Changed to True to allow global state-wide cards to use "All"
     )
-    asset_type = Column(cultural_asset_type_enum, nullable=False)
+    pillar_category = Column(String(100), nullable=False) # Maps to your frontend filters
     title = Column(String(200), nullable=False)
     description = Column(Text, nullable=False)
+    specification = Column(Text, nullable=False) # Powers your Vector Ledger readout
+    icon = Column(String(50), nullable=False)
     image_url = Column(String(255), nullable=True)
-    metadata = Column(Text, nullable=True)  # JSON-serialized regional details
+    
+    # 🌟 THE SOLUTION: Houses the entire array of child carousel slides dynamically
+    sub_items = Column(JSON, nullable=True) 
+    
     created_at = Column(
         TIMESTAMP(timezone=False),
         nullable=False,
@@ -386,6 +397,52 @@ class Notification(Base):
     )
 
     grievance = relationship("Grievance", back_populates="notifications")
+
+
+class WeatherStation(Base):
+    """IMD Climatology Doppler Radar Node collecting composite multi-factor environmental indices."""
+    __tablename__ = "weather_stations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    station_name = Column(String(200), nullable=False)
+    district = Column(String(100), nullable=False)
+    elevation_m = Column(Integer, nullable=False)
+    terrain_type = Column(String(100), nullable=False)
+
+    # Season-Aware Bounds
+    current_season = Column(String(50), default="Monsoon")  # Spring, Summer, Monsoon, Autumn, Winter
+    temp_day_ceiling = Column(Numeric(4, 1))
+    temp_night_floor = Column(Numeric(4, 1))
+
+    # Live Multi-Factor Environmental Telemetry Gauges
+    rainfall_1hr_mm = Column(Numeric(5, 2), default=0.0)
+    temperature_c = Column(Numeric(4, 1), default=15.0)
+    river_stage_m = Column(Numeric(4, 2), default=0.0)
+    landslide_sensor_triggered = Column(Boolean, default=False)
+    debris_flow_detected = Column(Boolean, default=False)
+
+    # Takri-Inspired Heritage Early Warning Metadata Tokens
+    takri_status_label = Column(String(100), default="Sthir")  # Sthir, Nazar, Satark, Sankat, Megh-Vipaat
+    dashboard_status = Column(String(100), default="Normal")  # Normal, Light Rain, Heavy, Cloudburst, etc.
+    last_ping = Column(DateTime, default=datetime.utcnow)
+
+
+class TransitRoute(Base):
+    """HRTC Mountain Corridor & Trans-Himalayan Pass Tracking Ledger."""
+    __tablename__ = "transit_routes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    route_name = Column(String(200), nullable=False, unique=True)
+    origin = Column(String(100), nullable=False)
+    destination = Column(String(100), nullable=False)
+    key_hazard_zone = Column(String(150), nullable=False)  # e.g., Malling Nallah, Sach Pass, Page Nallah
+    hazard_profile = Column(Text, nullable=False)  # e.g., Shooting stones, Avalanche paths, Black Ice
+
+    # Active Operational State
+    current_status = Column(String(50), default="Operational")  # Operational, Delayed, Suspended, Blocked
+    roznamcha_remarks = Column(Text, nullable=True)  # Daily register account ledger text
+    relay_state = Column(String(50), default="Jagrit")  # Jagrit (Online) or Maun (Offline)
+    updated_at = Column(DateTime, default=datetime.utcnow)
 
 
 update_modified_column = DDL(
