@@ -57,11 +57,31 @@ Department routing is driven by infrastructure type:
 | `GET` | `/api/grievances` | Returns all grievances with server-side upvote promotion applied. |
 | `POST` | `/api/grievances` | Creates a terrain-aware grievance. |
 | `POST` | `/api/grievances/{ticket_id}/upvote` | Increments community upvotes and applies critical promotion. |
+| `PATCH` | `/api/grievances/{ticket_id}/verification` | Officer-only verification toggle for credibility controls. |
 | `POST` | `/api/grievances/{ticket_id}/resolve` | Requires `resolutionNotes` and `validationImageUrl` before verified closure. |
 | `POST` | `/api/grievances/{ticket_id}/reopen` | Records citizen veto/reopen feedback for a resolved work item. |
 | `GET` | `/api/admin/executive-alerts` | Returns CM Office KPIs, district load, and alert telemetry. |
 
 The staff login route remains available at `/api/v1/auth/login`.
+
+## Background Ingestion Layer (APScheduler)
+
+The backend now includes `backend/ingestor.py` with modular providers and safe SQLAlchemy upserts:
+
+- `OpenWeatherMapProvider` pulls live weather metrics for Himachal station coordinates.
+- `ConfigurableTransitProvider` ingests route alerts from `TRANSIT_ALERTS_JSON`.
+- `IngestionService` handles resilient DB writes with rollback on errors.
+
+FastAPI startup wires APScheduler in `backend/main.py`:
+
+- Weather sync job every 10 minutes
+- Transit sync job every 5 minutes
+- Non-blocking background execution with `BackgroundScheduler`
+
+Required environment variables:
+
+- `OPENWEATHERMAP_API_KEY` for weather ingestion
+- `TRANSIT_ALERTS_JSON` containing transit alerts as a JSON array
 
 ## Docker Files
 

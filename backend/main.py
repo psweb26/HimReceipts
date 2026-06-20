@@ -6,14 +6,17 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import Depends, FastAPI, Form, HTTPException, status
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from database import Base, SessionLocal, engine, get_db
+from ingestor import build_ingestion_service
 from security import hash_password, verify_password
 import models
 from models import (
@@ -104,6 +107,7 @@ DEFAULT_COORDINATES_BY_DISTRICT = {
 }
 
 sla_monitor_thread: Optional[threading.Thread] = None
+ingestion_scheduler: Optional[BackgroundScheduler] = None
 
 app = FastAPI(
     title="HimSetu: Unified Civic Accountability & Heritage Platform",
@@ -153,6 +157,7 @@ class GrievanceResponse(BaseModel):
     block: str
     panchayat: str
     upvotes: int
+    is_verified: bool
     terrainRisk: str
     infrastructureType: str
     department: str
@@ -187,6 +192,19 @@ class GrievanceReopenResponse(BaseModel):
     is_escalated_to_supervisor: bool
     sla_due_date: datetime
     log_id: int
+
+
+class GrievanceVerificationRequest(BaseModel):
+    officerId: int = Field(..., gt=0)
+    isVerified: bool
+    remarks: Optional[str] = None
+
+
+class GrievanceVerificationResponse(BaseModel):
+    ticket_id: str
+    previous_verification: bool
+    is_verified: bool
+    updated_by_officer_id: int
 
 class CitizenVetoRequest(BaseModel):
     veto_remarks: str
@@ -368,8 +386,27 @@ def get_or_create_officer(
     db.flush()
     return officer
 
+
+def ensure_schema_updates() -> None:
+    db = SessionLocal()
+    try:
+        db.execute(
+            text(
+                "ALTER TABLE grievances "
+                "ADD COLUMN IF NOT EXISTS is_verified BOOLEAN NOT NULL DEFAULT false;"
+            )
+        )
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
+
+
 def bootstrap_database() -> None:
     Base.metadata.create_all(bind=engine)
+    ensure_schema_updates()
 
     db = SessionLocal()
     try:
@@ -548,6 +585,7 @@ def seed_bootstrap_grievances(
             terrain_risk=payload["terrainRisk"],
             infrastructure_type=payload["infrastructureType"],
             upvotes=payload["upvotes"],
+            is_verified=False,
             title=payload["title"],
             description=payload["description"],
             intake_photo_url="",
@@ -634,6 +672,7 @@ def serialize_grievance(grievance: Grievance) -> GrievanceResponse:
         block=grievance.block,
         panchayat=grievance.panchayat,
         upvotes=int(grievance.upvotes or 0),
+        is_verified=bool(grievance.is_verified),
         terrainRisk=grievance.terrain_risk,
         infrastructureType=grievance.infrastructure_type,
         department=grievance.department.name,
@@ -685,14 +724,61 @@ def run_sla_compliance_monitor() -> None:
             worker_db.close()
         time.sleep(SLA_MONITOR_INTERVAL_SECONDS)
 
+
+def require_officer_role(db: Session, officer_id: int) -> Officer:
+    officer = db.query(Officer).filter(Officer.id == officer_id).first()
+    if officer is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Officer account not found.",
+        )
+    if enum_value(officer.role) != "Officer":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only users with role 'Officer' can update verification.",
+        )
+    return officer
+
 @app.on_event("startup")
 def start_sla_compliance_monitor() -> None:
+    global ingestion_scheduler
     global sla_monitor_thread
     bootstrap_database()
-    if sla_monitor_thread and sla_monitor_thread.is_alive():
+    if sla_monitor_thread is None or not sla_monitor_thread.is_alive():
+        sla_monitor_thread = threading.Thread(target=run_sla_compliance_monitor, daemon=True)
+        sla_monitor_thread.start()
+
+    if ingestion_scheduler and ingestion_scheduler.running:
         return
-    sla_monitor_thread = threading.Thread(target=run_sla_compliance_monitor, daemon=True)
-    sla_monitor_thread.start()
+
+    ingestion_service = build_ingestion_service()
+    ingestion_scheduler = BackgroundScheduler(
+        timezone="Asia/Kolkata",
+        job_defaults={"coalesce": True, "max_instances": 1},
+    )
+    ingestion_scheduler.add_job(
+        ingestion_service.run_weather_sync,
+        trigger=IntervalTrigger(minutes=10),
+        id="weather-ingestion",
+        replace_existing=True,
+    )
+    ingestion_scheduler.add_job(
+        ingestion_service.run_transit_sync,
+        trigger=IntervalTrigger(minutes=5),
+        id="transit-ingestion",
+        replace_existing=True,
+    )
+    ingestion_scheduler.start()
+    ingestion_service.run_weather_sync()
+    ingestion_service.run_transit_sync()
+
+
+@app.on_event("shutdown")
+def stop_ingestion_scheduler() -> None:
+    global ingestion_scheduler
+    if ingestion_scheduler and ingestion_scheduler.running:
+        ingestion_scheduler.shutdown(wait=False)
+    ingestion_scheduler = None
 
 @app.get("/health")
 def health_check() -> Dict[str, str]:
@@ -776,6 +862,7 @@ def create_grievance(
         terrain_risk=terrainRisk,
         infrastructure_type=infrastructureType,
         upvotes=0,
+        is_verified=False,
         title=title,
         description=description,
         intake_photo_url="",
@@ -816,6 +903,62 @@ def upvote_grievance(ticket_id: str, db: Session = Depends(get_db)) -> Grievance
         db.rollback()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Upvote transaction commit error.") from exc
     return serialize_grievance(grievance)
+
+
+@app.patch("/api/grievances/{ticket_id}/verification", response_model=GrievanceVerificationResponse)
+def update_grievance_verification(
+    ticket_id: str,
+    payload: GrievanceVerificationRequest,
+    db: Session = Depends(get_db),
+) -> GrievanceVerificationResponse:
+    officer = require_officer_role(db, payload.officerId)
+    grievance = (
+        db.query(Grievance)
+        .filter(Grievance.ticket_id == ticket_id)
+        .with_for_update()
+        .first()
+    )
+    if grievance is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Grievance ticket not found.",
+        )
+
+    previous_verification = bool(grievance.is_verified)
+    grievance.is_verified = bool(payload.isVerified)
+    if grievance.is_verified and enum_value(grievance.status) == "Pending":
+        grievance.status = "Under Verification"
+
+    verification_note = payload.remarks.strip() if isinstance(payload.remarks, str) else ""
+    db.add(
+        Notification(
+            grievance_id=grievance.id,
+            recipient_type="Command Center",
+            channel="Email",
+            message=(
+                f"Ticket {grievance.ticket_id} verification changed to "
+                f"{'Verified' if grievance.is_verified else 'Pending'} by Officer ID {officer.id}."
+                + (f" Remarks: {verification_note}" if verification_note else "")
+            ),
+        )
+    )
+
+    try:
+        db.commit()
+    except SQLAlchemyError as exc:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update verification status.",
+        ) from exc
+
+    return GrievanceVerificationResponse(
+        ticket_id=grievance.ticket_id,
+        previous_verification=previous_verification,
+        is_verified=bool(grievance.is_verified),
+        updated_by_officer_id=officer.id,
+    )
+
 
 @app.post("/api/grievances/{ticket_id}/resolve", response_model=GrievanceResolveResponse)
 def resolve_grievance(

@@ -33,6 +33,7 @@ import {
   ThumbsUp,
 } from "lucide-react";
 import HimachalVectorMap from "./components/HimachalVectorMap";
+import IdentityMosaic from "./components/IdentityMosaic";
 import himachalCrest from "./assets/himachal-crest.png";
 import { COMPREHENSIVE_HERITAGE_REGISTRY } from "./assets/culturalData";
 
@@ -138,9 +139,9 @@ const priorityLabel = {
 };
 
 const inputClass =
-  "w-full rounded-sm border border-[var(--dry-wool)] bg-white px-4 py-3 text-sm " +
+  "w-full rounded-xl border border-white/40 bg-white/70 px-4 py-3 text-sm backdrop-blur-sm " +
   "text-slate-900 outline-none transition placeholder:text-slate-400 " +
-  "focus:border-[var(--devdar-forest)] focus:ring-2 focus:ring-[var(--devdar-forest)]/10 shadow-2xs";
+  "focus:border-[var(--him-pine)] focus:ring-2 focus:ring-[var(--him-pine)]/20 shadow-[var(--glass-shadow)]";
 
 const cx = (...classes) => classes.filter(Boolean).join(" ");
 
@@ -608,7 +609,7 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
 
   return (
     <div className="space-y-6">
-      <div className="kathkuni-card bg-white p-6 flex flex-col md:flex-row items-center gap-6 overflow-hidden relative">
+      <div className="glass-panel p-6 flex flex-col md:flex-row items-center gap-6 overflow-hidden relative">
         <div className="flex-1 space-y-2">
           <span className="text-[10px] bg-[var(--kinnaur-marigold)] text-slate-950 font-black px-2.5 py-1 rounded-2xs uppercase tracking-widest">
             Public Interface Core
@@ -1052,7 +1053,7 @@ function TelemetryPillar({ grievances, nowMs }) {
 
   return (
     <div className="space-y-4">
-      <section className="kathkuni-card bg-white p-5">
+      <section className="glass-panel bg-[linear-gradient(145deg,rgba(12,26,22,.98),rgba(20,35,47,.96))] p-5 text-white">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <PanelHeader
             eyebrow="CM Office Command Console"
@@ -1060,20 +1061,20 @@ function TelemetryPillar({ grievances, nowMs }) {
             title="Executive Weather and Transit Cockpit"
           />
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex h-9 items-center gap-2 rounded-sm border border-[var(--dry-wool)] bg-[#F5F7FA] px-3 text-[10px] font-black uppercase tracking-wider text-slate-600">
-              <Radio className={cx("h-3.5 w-3.5", refreshing ? "animate-pulse text-[var(--pahadi-crimson)]" : "text-emerald-700")} aria-hidden="true" />
+            <span className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 text-[10px] font-black uppercase tracking-wider text-slate-100 backdrop-blur-sm">
+              <Radio className={cx("h-3.5 w-3.5", refreshing ? "animate-pulse text-[var(--him-marigold)]" : "text-emerald-300")} aria-hidden="true" />
               {refreshing ? "Syncing" : "Live Feed"}
             </span>
             <button
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-sm border border-[var(--dry-wool)] bg-white px-4 text-xs font-bold uppercase tracking-wider text-slate-700 shadow-2xs transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-xl border border-white/20 bg-white/10 px-4 text-xs font-bold uppercase tracking-wider text-white shadow-[var(--glass-shadow)] transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={refreshing}
               onClick={refreshTelemetry}
               type="button"
             >
               {refreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin text-[var(--devdar-forest)]" aria-hidden="true" />
+                <Loader2 className="h-4 w-4 animate-spin text-[var(--him-marigold)]" aria-hidden="true" />
               ) : (
-                <RefreshCcw className="h-4 w-4 text-[var(--devdar-forest)]" aria-hidden="true" />
+                <RefreshCcw className="h-4 w-4 text-[var(--him-marigold)]" aria-hidden="true" />
               )}
               Sync Feeds
             </button>
@@ -1081,7 +1082,7 @@ function TelemetryPillar({ grievances, nowMs }) {
         </div>
 
         {telemetryError && (
-          <div className="mt-4 flex items-start gap-2 rounded-sm border border-[var(--pahadi-crimson)]/30 bg-rose-50 p-3 text-xs font-semibold text-[var(--pahadi-crimson)]">
+          <div className="mt-4 flex items-start gap-2 rounded-xl border border-[var(--him-crimson)]/50 bg-[var(--him-crimson)]/20 p-3 text-xs font-semibold text-rose-100">
             <XCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
             <span>{telemetryError}</span>
           </div>
@@ -1394,7 +1395,7 @@ function HeritagePillar() {
           <span className="text-[10px] bg-[var(--devdar-forest)] text-[#F5F7FA] font-black px-2.5 py-1 rounded-2xs uppercase tracking-widest">
             Identity Ledger Backplane
           </span>
-          <h2 className="text-xl font-black text-[var(--devdar-forest)] uppercase tracking-tight">
+          <h2 className="font-heading text-2xl font-semibold text-[var(--him-pine)] tracking-tight">
             हमारी विरासत / Cultural Asset Canvas Registry
           </h2>
           <p className="text-xs text-slate-600 max-w-4xl leading-relaxed">
@@ -1410,11 +1411,11 @@ function HeritagePillar() {
         </div>
       </div>
 
-      <div className="kathkuni-card bg-white p-4 grid gap-4 md:grid-cols-4 items-center">
+      <div className="glass-panel p-4 grid gap-4 md:grid-cols-4 items-center">
         <div className="md:col-span-2 relative">
           <input
             type="text"
-            className="w-full rounded-sm border border-[var(--dry-wool)] bg-white pl-4 pr-10 py-2.5 text-xs text-slate-900 outline-none focus:border-[var(--devdar-forest)] shadow-2xs placeholder:text-slate-400 font-semibold"
+            className="w-full rounded-xl border border-white/40 bg-white/70 pl-4 pr-10 py-2.5 text-xs text-slate-900 outline-none focus:border-[var(--him-pine)] shadow-[var(--glass-shadow)] backdrop-blur-sm placeholder:text-slate-400 font-semibold"
             placeholder="🔍 Query 28 cultural asset dimensions (ranges, items, passes, gems, dishes)..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
@@ -1431,7 +1432,7 @@ function HeritagePillar() {
 
         <div className="flex flex-col gap-1">
           <select
-            className="w-full rounded-sm border border-[var(--dry-wool)] bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-[var(--devdar-forest)]"
+            className="w-full rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-[var(--him-pine)] backdrop-blur-sm"
             value={selectedDistrictFilter}
             onChange={(e) => setSelectedDistrictFilter(e.target.value)}
           >
@@ -1443,7 +1444,7 @@ function HeritagePillar() {
 
         <div className="flex flex-col gap-1">
           <select
-            className="w-full rounded-sm border border-[var(--dry-wool)] bg-slate-50 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-[var(--devdar-forest)]"
+            className="w-full rounded-xl border border-white/40 bg-white/70 px-3 py-2 text-xs font-bold text-slate-700 outline-none focus:border-[var(--him-pine)] backdrop-blur-sm"
             value={selectedCategoryFilter}
             onChange={(e) => setSelectedCategoryFilter(e.target.value)}
           >
@@ -1456,50 +1457,13 @@ function HeritagePillar() {
 
       <div className="himachali-weave-divider rounded-xs" />
 
-      {filteredAssets.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-          {filteredAssets.map((asset) => (
-            <div
-              key={asset.id}
-              onClick={() => {
-                setActiveDeckAsset(asset);
-                setCarouselIndex(0);
-              }}
-              className="kathkuni-card bg-white p-5 cursor-pointer flex flex-col justify-between border-b-4 border-b-[var(--dry-wool)] hover:border-b-[var(--kinnaur-marigold)] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-3xl filter drop-shadow-2xs select-none">{asset.icon}</span>
-                  <span className="bg-slate-50 text-slate-700 font-mono text-[9px] font-black tracking-wider px-2 py-0.5 border border-[var(--dry-wool)] rounded-xs uppercase shadow-3xs">
-                    {asset.sub_items ? `${asset.sub_items.length} Elements Linked` : "Static Vector"}
-                  </span>
-                </div>
-                <h3 className="text-sm font-black text-[var(--devdar-forest)] uppercase tracking-tight">{asset.title}</h3>
-                <p className="text-xs text-slate-500 leading-relaxed line-clamp-3">{asset.description}</p>
-              </div>
-              
-              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] font-bold text-[var(--pahadi-crimson)] uppercase tracking-wider">
-                <span>Open Creative Deck →</span>
-                <span className="text-slate-400 font-mono text-[9px] lowercase tracking-normal bg-slate-100 px-1.5 py-0.5 rounded-xs">{asset.id}</span>
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="mt-5 grid min-h-44 place-items-center rounded-sm border border-dashed border-[var(--dry-wool)] bg-white p-8 text-center shadow-2xs">
-          <div>
-            <div className="mx-auto grid h-10 w-10 place-items-center rounded-sm border border-[var(--dry-wool)] bg-[#F5F7FA] text-slate-400 shadow-3xs">
-              <Sparkles className="h-5 w-5 text-[var(--pahadi-crimson)]" />
-            </div>
-            <p className="mt-3 text-xs font-black text-slate-800 uppercase tracking-wide">
-              No Cultural Pillars Found Matching Query
-            </p>
-            <p className="mt-1 text-xs text-slate-500 max-w-sm mx-auto">
-              Your search phrase did not match any of the 28 registered ledger fields or deep specifications.
-            </p>
-          </div>
-        </div>
-      )}
+      <IdentityMosaic
+        assets={filteredAssets}
+        onSelectAsset={(asset) => {
+          setActiveDeckAsset(asset);
+          setCarouselIndex(0);
+        }}
+      />
 
       {/* 🚀 HIGH-FIDELITY GLASSMORPHISM TINDER-STYLE CAROUSEL DECK MODAL */}
       {activeDeckAsset && activeDeckAsset.sub_items && (
