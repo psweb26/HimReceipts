@@ -30,7 +30,13 @@ export default function IdentityMosaic({ assets, onSelectAsset }) {
         >
           <div className="space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-3xl filter drop-shadow-2xs select-none">{asset.icon}</span>
+              <span
+                className="text-3xl filter drop-shadow-2xs select-none"
+                role="img"
+                aria-label={`${asset.title} icon`}
+              >
+                {asset.icon}
+              </span>
               <span className="rounded-full border border-[var(--him-stone)] bg-white/70 px-2 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-700 backdrop-blur-sm">
                 {asset.sub_items ? `${asset.sub_items.length} Elements` : "Static Vector"}
               </span>

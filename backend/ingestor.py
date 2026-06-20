@@ -97,12 +97,13 @@ class OpenWeatherMapProvider(WeatherProvider):
             method="GET",
             headers={"User-Agent": "HimSetu-Ingestor/1.0"},
         )
-        with urlopen(request, timeout=15) as response:
+        # Python's HTTPS client verifies certificates by default for urlopen.
+        with urlopen(request, timeout=10) as response:
             payload = json.loads(response.read().decode("utf-8"))
 
         rain = float(payload.get("rain", {}).get("1h", 0.0))
         temperature = float(payload.get("main", {}).get("temp", 0.0))
-        weather_desc = " ".join((item.get("main", "") for item in payload.get("weather", []))).lower()
+        weather_desc = " ".join(item.get("main", "") for item in payload.get("weather", [])).lower()
         landslide_signal = rain > 75 or "thunderstorm" in weather_desc
 
         return WeatherReading(

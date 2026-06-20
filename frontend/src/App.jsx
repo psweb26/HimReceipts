@@ -1053,7 +1053,7 @@ function TelemetryPillar({ grievances, nowMs }) {
 
   return (
     <div className="space-y-4">
-      <section className="glass-panel bg-[linear-gradient(145deg,rgba(20,34,30,.92),rgba(28,42,58,.86))] p-5 text-white">
+      <section className="glass-panel bg-[linear-gradient(145deg,rgba(12,26,22,.98),rgba(20,35,47,.96))] p-5 text-white">
         <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
           <PanelHeader
             eyebrow="CM Office Command Console"
