@@ -91,8 +91,12 @@ class OpenWeatherMapProvider(WeatherProvider):
                 "units": "metric",
             }
         )
-        request = Request(url=f"{self.base_url}?{query}", method="GET")
-        with urlopen(request, timeout=15) as response:  # nosec B310
+        request = Request(
+            url=f"{self.base_url}?{query}",
+            method="GET",
+            headers={"User-Agent": "HimSetu-Ingestor/1.0"},
+        )
+        with urlopen(request, timeout=15) as response:
             payload = json.loads(response.read().decode("utf-8"))
 
         rain = float(payload.get("rain", {}).get("1h", 0.0))

@@ -744,9 +744,7 @@ def start_sla_compliance_monitor() -> None:
     global ingestion_scheduler
     global sla_monitor_thread
     bootstrap_database()
-    if sla_monitor_thread and sla_monitor_thread.is_alive():
-        pass
-    else:
+    if not sla_monitor_thread or not sla_monitor_thread.is_alive():
         sla_monitor_thread = threading.Thread(target=run_sla_compliance_monitor, daemon=True)
         sla_monitor_thread.start()
 
@@ -931,7 +929,7 @@ def update_grievance_verification(
     if grievance.is_verified and enum_value(grievance.status) == "Pending":
         grievance.status = "Under Verification"
 
-    verification_note = payload.remarks.strip() if payload.remarks else ""
+    verification_note = payload.remarks.strip() if payload.remarks is not None else ""
     db.add(
         Notification(
             grievance_id=grievance.id,
