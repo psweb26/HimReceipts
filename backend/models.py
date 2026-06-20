@@ -193,6 +193,7 @@ class Grievance(Base):
         Index("ix_grievances_department_id", "department_id"),
         Index("ix_grievances_assigned_officer_id", "assigned_officer_id"),
         Index("ix_grievances_upvotes", "upvotes"),
+        Index("ix_grievances_is_verified", "is_verified"),
         Index("ix_grievances_created_at", "created_at"),
     )
 
@@ -227,6 +228,11 @@ class Grievance(Base):
         Integer,
         nullable=False,
         server_default=text("0"),
+    )
+    is_verified = Column(
+        Boolean,
+        nullable=False,
+        server_default=text("false"),
     )
     title = Column(String(150), nullable=False)
     description = Column(Text, nullable=False)

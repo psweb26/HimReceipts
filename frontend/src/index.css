@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700;800;900&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -10,6 +11,13 @@
     --spiti-snow: #F5F7FA;           /* Flat backing canvas layout */
     --dry-wool: #D4C5B3;             /* Structural line dividers, card panels */
     --kinnaur-marigold: #E29B12;     /* Medium warnings, active state markers */
+    --him-pine: #1a3b31;
+    --him-slate: #344451;
+    --him-stone: #c8d0cf;
+    --him-stone-soft: #f4f7f7;
+    --him-crimson: #8f2134;
+    --him-marigold: #d89a23;
+    --glass-shadow: 0 14px 38px rgba(10, 22, 28, 0.16);
     
     /* Structural Framing Constants (Kath-Kuni Masonry feel) */
     --kathkuni-radius: 4px;
@@ -17,13 +25,24 @@
   }
 
   body {
-    /* Replacing your generic light background tint with an authentic Spiti mountain snow mist gradient */
-    @apply bg-gradient-to-br from-[#F5F7FA] via-[#FAF9F7] to-[#EAECEF] text-slate-800 antialiased;
+    @apply bg-gradient-to-br from-[#edf3f1] via-[#f7f7f6] to-[#e7ecef] text-slate-800 antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  }
+
+  .font-heading {
+    font-family: 'Marcellus', 'Times New Roman', serif;
   }
 }
 
 @layer utilities {
+  .glass-panel {
+    @apply rounded-2xl border border-white/35 bg-white/60 shadow-[var(--glass-shadow)] backdrop-blur-lg;
+  }
+
+  .glass-mosaic-card {
+    @apply glass-panel p-5 transition-all duration-200 hover:-translate-y-1 hover:border-[var(--him-marigold)] hover:bg-white/75;
+  }
+
   /* Traditional Weave Ribbon (Dynamic geometric strip helper) */
   .himachali-weave-divider {
     height: 8px;
