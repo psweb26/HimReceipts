@@ -25,6 +25,7 @@
   }
 
   body {
+    /* Spiti mountain snow mist gradient tuned for the Himachali glassmorphism palette */
     @apply bg-gradient-to-br from-[#edf3f1] via-[#f7f7f6] to-[#e7ecef] text-slate-800 antialiased;
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
   }

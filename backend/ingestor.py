@@ -2,10 +2,11 @@ import json
 import logging
 import os
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Dict, Iterable, List, Optional
 from urllib.parse import urlencode
+from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from sqlalchemy.exc import SQLAlchemyError
@@ -78,7 +79,7 @@ class OpenWeatherMapProvider(WeatherProvider):
                 reading = self._fetch_location(location)
                 if reading:
                     readings.append(reading)
-            except Exception as exc:  # noqa: BLE001
+            except (HTTPError, URLError, TimeoutError, ValueError, KeyError) as exc:
                 logger.warning("Weather ingestion failed for %s: %s", location["station_name"], exc)
         return readings
 
@@ -179,7 +180,7 @@ class IngestionService:
         except SQLAlchemyError as exc:
             db.rollback()
             logger.error("Ingestion database transaction rolled back: %s", exc)
-        except Exception as exc:  # noqa: BLE001
+        except (ValueError, TypeError) as exc:
             db.rollback()
             logger.error("Ingestion runtime failure: %s", exc)
         finally:
@@ -206,7 +207,7 @@ class IngestionService:
             record.river_stage_m = Decimal(f"{reading.river_stage_m:.2f}")
             record.landslide_sensor_triggered = bool(reading.landslide_sensor_triggered)
             record.debris_flow_detected = bool(reading.debris_flow_detected)
-            record.last_ping = datetime.utcnow()
+            record.last_ping = datetime.now(timezone.utc).replace(tzinfo=None)
 
     def _upsert_transit(self, db: Session, alerts: Iterable[TransitAlert]) -> None:
         for alert in alerts:
@@ -225,7 +226,7 @@ class IngestionService:
             record.current_status = alert.current_status
             record.roznamcha_remarks = alert.roznamcha_remarks
             record.relay_state = alert.relay_state
-            record.updated_at = datetime.utcnow()
+            record.updated_at = datetime.now(timezone.utc).replace(tzinfo=None)
 
 
 def build_ingestion_service() -> IngestionService:
