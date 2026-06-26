@@ -32,6 +32,8 @@ import {
   XCircle,
   ThumbsUp,
 } from "lucide-react";
+
+
 import HimachalVectorMap from "./components/HimachalVectorMap";
 import IdentityMosaic from "./components/IdentityMosaic";
 import himachalCrest from "./assets/himachal-crest.png";
@@ -42,6 +44,8 @@ const UPVOTE_CRITICAL_THRESHOLD = 30;
 const FLASH_FLOOD_RISK = "Flash Flood Khud Proximity";
 const CLOCK_INTERVAL_MS = 60_000;
 const APP_CLOCK_STARTED_AT_MS = new Date().getTime();
+
+
 
 const views = [
   {
@@ -401,6 +405,7 @@ function App() {
             setSelectedDistrict={setSelectedDistrict}
           />
         )}
+
         {activeView === "telemetry" && (
           <TelemetryPillar grievances={grievances} nowMs={nowMs} />
         )}
@@ -1003,18 +1008,23 @@ function TelemetryPillar({ grievances, nowMs }) {
       .slice(0, 10);
   }, [weatherNodes]);
 
-  const priorityTransitRoutes = useMemo(() => {
-    const statusRank = {
-      Blocked: 0,
-      Suspended: 1,
-      Delayed: 2,
-      Operational: 3,
-    };
+const priorityTransitRoutes = useMemo(() => {
+  if (!transitRoutes || transitRoutes.length === 0) return [];
+  
+  const statusRank = {
+    blocked: 0,
+    suspended: 1,
+    delayed: 2,
+    operational: 3,
+  };
 
-    return [...transitRoutes]
-      .sort((a, b) => (statusRank[a.current_status] ?? 4) - (statusRank[b.current_status] ?? 4))
-      .slice(0, 12);
-  }, [transitRoutes]);
+  return [...transitRoutes].sort((a, b) => {
+    const statusA = (a.current_status || "").toLowerCase();
+    const statusB = (b.current_status || "").toLowerCase();
+    return (statusRank[statusA] ?? 4) - (statusRank[statusB] ?? 4);
+  });
+}, [transitRoutes]);
+
 
   const weatherStatusStyles = {
     "Extreme Cloudburst": "border-rose-700 bg-rose-100 text-rose-900",
@@ -1026,12 +1036,12 @@ function TelemetryPillar({ grievances, nowMs }) {
     Normal: "border-emerald-200 bg-emerald-50 text-emerald-900",
   };
 
-  const transitStatusStyles = {
-    Operational: "border-emerald-200 bg-emerald-50 text-emerald-900",
-    Delayed: "border-amber-300 bg-amber-50 text-amber-950",
-    Blocked: "border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)]",
-    Suspended: "border-slate-300 bg-slate-100 text-slate-800",
-  };
+const transitStatusStyles = {
+  operational: "border-emerald-200 bg-emerald-50 text-emerald-900",
+  delayed: "border-amber-300 bg-amber-50 text-amber-950",
+  blocked: "border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)]",
+  suspended: "border-slate-300 bg-slate-100 text-slate-800",
+};
 
   function refreshTelemetry() {
     loadTelemetry();
@@ -1231,9 +1241,12 @@ function TelemetryPillar({ grievances, nowMs }) {
                       {route.origin} to {route.destination}
                     </p>
                   </div>
-                  <span className={cx("shrink-0 rounded-xs border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider", transitStatusStyles[route.current_status] ?? "border-slate-200 bg-white text-slate-700")}>
-                    {route.current_status || "Unknown"}
-                  </span>
+                    <span className={cx(
+                      "shrink-0 rounded-xs border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider", 
+                      transitStatusStyles[(route.current_status || "").toLowerCase()] ?? "border-slate-200 bg-white text-slate-700"
+                      )}>
+                      {route.current_status || "Unknown"}
+                    </span>
                 </div>
 
                 <div className="mt-3 grid gap-2 text-[10px] font-semibold text-slate-600 sm:grid-cols-2">

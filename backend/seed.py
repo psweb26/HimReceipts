@@ -1,15 +1,19 @@
 import logging
 import sys
+import os
+from dotenv import load_dotenv
+load_dotenv(dotenv_path="../.env")
+
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Iterable
-
+from datetime import timezone
 from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from security import hash_password
 
 from database import SessionLocal, engine
-from main import (
+from domain import (
     DEPARTMENT_CODES,
     HIMACHAL_ADMIN_HIERARCHY,
     SLA_HOURS_BY_PRIORITY,
@@ -31,6 +35,9 @@ from models import (
     TransitRoute,
     WeatherStation,
 )
+
+
+print(f"DEBUG: DATABASE_URL loaded: {os.getenv('DATABASE_URL')}")
 
 logging.basicConfig(
     level=logging.INFO,
@@ -165,7 +172,7 @@ def build_grievance_rows(now: datetime) -> list[Grievance]:
 
 def seed_anomaly_transactions(session) -> None:
     logger.info("Seeding HP monsoon infrastructure transactions.")
-    now = datetime.utcnow().replace(microsecond=0)
+    now = datetime.now(timezone.utc).replace(microsecond=0)
     grievance_rows = build_grievance_rows(now)
     add_records(session, grievance_rows)
     logger.info("Staged %s terrain-aware grievances.", len(grievance_rows))

@@ -174,6 +174,9 @@ class IngestionService:
         self._safe_db_update(self._upsert_transit, alerts)
 
     def _safe_db_update(self, sync_fn, payload: Iterable[object]) -> None:
+        if payload is None: # Critical guard rail
+            logger.warning("Attempted to sync with None payload; skipping.")
+            return
         db = SessionLocal()
         try:
             sync_fn(db, payload)

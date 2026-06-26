@@ -14,7 +14,8 @@ from sqlalchemy import (
     event,
     func,
     text,
-    JSON
+    JSON,
+    Float
 )
 from sqlalchemy.dialects.postgresql import ENUM, TIMESTAMP
 from sqlalchemy.orm import relationship
@@ -66,6 +67,64 @@ cultural_asset_type_enum = ENUM(
     name="cultural_asset_type",
     validate_strings=True,
 )
+
+class DataSource(Base):
+    __tablename__ = "data_sources"
+    id = Column(Integer, primary_key=True)
+    name = Column(String, unique=True, nullable=False)
+    source_priority = Column(Integer, default=50) 
+    last_successful_sync = Column(DateTime)
+    relay_state = Column(String, default="Maun") 
+    evidence_records = relationship("Evidence", back_populates="source")
+
+class Asset(Base):
+    __tablename__ = "assets"
+    id = Column(Integer, primary_key=True)
+    asset_type = Column(String, nullable=False) # Road, Bridge, Heritage, AWS, etc.
+    name = Column(String, nullable=False)
+    district = Column(String, nullable=False)
+    lat = Column(Float)
+    lon = Column(Float)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    incidents = relationship("Incident", back_populates="asset")
+
+class Incident(Base):
+    __tablename__ = "incidents"
+    id = Column(Integer, primary_key=True)
+    asset_id = Column(Integer, ForeignKey("assets.id"), nullable=False)
+    event_type = Column(String, nullable=False) # Landslide, Flood, etc.
+    current_state = Column(String, default="Forecast") # Forecast, Warning, Active, Resolved
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
+    asset = relationship("Asset", back_populates="incidents")
+    evidence_list = relationship("Evidence", back_populates="incident")
+    transitions = relationship("EventStateTransition", back_populates="incident")
+
+class Evidence(Base):
+    __tablename__ = "evidence"
+    id = Column(Integer, primary_key=True)
+    incident_id = Column(Integer, ForeignKey("incidents.id"), nullable=False)
+    source_id = Column(Integer, ForeignKey("data_sources.id"), nullable=False)
+    evidence_type = Column(String, nullable=False) # Image, Bulletin, Report
+    summary = Column(String)
+    payload = Column(JSON, nullable=False) # Immutable raw data
+    source_timestamp = Column(DateTime)
+    created_at = Column(DateTime, default=func.now())
+    incident = relationship("Incident", back_populates="evidence_list")
+    source = relationship("DataSource", back_populates="evidence_records")
+
+class EventStateTransition(Base):
+    __tablename__ = "event_state_transitions"
+    id = Column(Integer, primary_key=True)
+    incident_id = Column(Integer, ForeignKey("incidents.id"), nullable=False)
+    from_state = Column(String)
+    to_state = Column(String)
+    actor_type = Column(String) # System, Citizen, PWD, Admin
+    reason = Column(Text)
+    evidence_id = Column(Integer, ForeignKey("evidence.id"), nullable=True)
+    created_at = Column(DateTime, default=func.now())
+    incident = relationship("Incident", back_populates="transitions")
 
 
 class District(Base):

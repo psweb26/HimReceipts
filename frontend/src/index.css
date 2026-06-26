@@ -1,117 +1,212 @@
-@import url('https://fonts.googleapis.com/css2?family=Marcellus&family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Marcellus&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
   :root {
-    /* Authentic Regional Design Tokens */
-    --devdar-forest: #1B3B2B;        /* Primary headers, dark backgrounds */
-    --pahadi-crimson: #9E1B2C;       /* Critical alerts, accent CTAs */
-    --spiti-snow: #F5F7FA;           /* Flat backing canvas layout */
-    --dry-wool: #D4C5B3;             /* Structural line dividers, card panels */
-    --kinnaur-marigold: #E29B12;     /* Medium warnings, active state markers */
-    --him-pine: #1a3b31;
-    --him-slate: #344451;
-    --him-stone: #c8d0cf;
-    --him-stone-soft: #f4f7f7;
-    --him-crimson: #8f2134;
-    --him-marigold: #d89a23;
-    --glass-shadow: 0 14px 38px rgba(10, 22, 28, 0.16);
-    
-    /* Structural Framing Constants (Kath-Kuni Masonry feel) */
-    --kathkuni-radius: 4px;
-    --timber-thick: 5px;
+    /* ---------- Primary Palette ---------- */
+
+    --devdar-forest: #1b3b2b;
+    --pahadi-crimson: #9e1b2c;
+    --kinnaur-marigold: #e29b12;
+
+    --spiti-snow: #f7f9fc;
+    --him-stone: #d8dee5;
+    --him-stone-soft: #f8fafc;
+
+    --him-slate: #475569;
+    --him-pine: #18352a;
+
+    /* ---------- Radius ---------- */
+
+    --radius-lg: 18px;
+    --radius-md: 14px;
+    --radius-sm: 10px;
+
+    /* ---------- Shadows ---------- */
+
+    --shadow-soft: 0 6px 24px rgba(15, 23, 42, 0.05);
+
+    --shadow-hover: 0 14px 36px rgba(15, 23, 42, 0.1);
+  }
+
+  html {
+    scroll-behavior: smooth;
   }
 
   body {
-    /* Spiti mountain snow mist gradient tuned for the Himachali glassmorphism palette */
-    @apply bg-gradient-to-br from-[#edf3f1] via-[#f7f7f6] to-[#e7ecef] text-slate-800 antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    background: linear-gradient(180deg, #eef4fb 0%, #f7fafc 45%, #edf2f7 100%);
+
+    color: #0f172a;
+
+    font-family: "Inter", system-ui, sans-serif;
+
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+
+    min-height: 100vh;
   }
 
   .font-heading {
-    font-family: 'Marcellus', 'Times New Roman', serif;
+    font-family: "Marcellus", serif;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
 }
 
 @layer utilities {
+  /* ---------- Premium Cards ---------- */
+
   .glass-panel {
-    @apply rounded-2xl border border-white/35 bg-white/60 shadow-[var(--glass-shadow)] backdrop-blur-lg;
+    background: rgba(255, 255, 255, 0.82);
+
+    backdrop-filter: blur(12px);
+
+    border: 1px solid rgba(255, 255, 255, 0.55);
+
+    border-radius: 18px;
+
+    box-shadow: var(--shadow-soft);
+
+    transition: 0.25s ease;
+  }
+
+  .glass-panel:hover {
+    box-shadow: var(--shadow-hover);
+
+    transform: translateY(-2px);
   }
 
   .glass-mosaic-card {
-    @apply glass-panel p-5 transition-all duration-200 hover:-translate-y-1 hover:border-[var(--him-marigold)] hover:bg-white/75;
+    @apply glass-panel p-6;
   }
 
-  /* Traditional Weave Ribbon (Dynamic geometric strip helper) */
+  /* ---------- Dashboard Cards ---------- */
+
+  .dashboard-card {
+    @apply bg-white rounded-2xl border border-slate-200 shadow-sm;
+
+    transition: all 0.25s ease;
+  }
+
+  .dashboard-card:hover {
+    transform: translateY(-3px);
+
+    box-shadow: 0 16px 30px rgba(0, 0, 0, 0.08);
+  }
+
+  /* ---------- Traditional Divider ---------- */
+
   .himachali-weave-divider {
     height: 8px;
+
     width: 100%;
+
     background-color: var(--pahadi-crimson);
-    background-image: 
-      linear-gradient(45deg, var(--kinnaur-marigold) 25%, transparent 25%), 
-      linear-gradient(-45deg, var(--kinnaur-marigold) 25%, transparent 25%), 
-      linear-gradient(45deg, transparent 75%, var(--devdar-forest) 75%), 
+
+    background-image:
+      linear-gradient(45deg, var(--kinnaur-marigold) 25%, transparent 25%),
+      linear-gradient(-45deg, var(--kinnaur-marigold) 25%, transparent 25%),
+      linear-gradient(45deg, transparent 75%, var(--devdar-forest) 75%),
       linear-gradient(-45deg, transparent 75%, var(--devdar-forest) 75%);
+
     background-size: 16px 16px;
-    background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+
+    background-position:
+      0 0,
+      0 8px,
+      8px -8px,
+      -8px 0;
   }
 
-  /* Structural Kath-Kuni Layer Panel Layout */
+  /* ---------- Kath Kuni ---------- */
+
   .kathkuni-card {
-    background-color: #ffffff;
-    border: 1px solid var(--dry-wool);
-    border-bottom: var(--timber-thick) solid #784A2B; /* Interlocking timber weight effect */
-    border-radius: var(--kathkuni-radius);
+    background: #fff;
+
+    border: 1px solid var(--him-stone);
+
+    border-bottom: 5px solid #7a5130;
+
+    border-radius: 12px;
   }
 
-  /* --- Existing Animation Core (Preserved & Maintained) --- */
+  /* ---------- Animations ---------- */
+
   @keyframes enter {
     from {
-      opacity: var(--tw-enter-opacity, 1);
-      transform: scale(var(--tw-enter-scale, 1));
+      opacity: 0;
+
+      transform: translateY(8px);
+    }
+
+    to {
+      opacity: 1;
+
+      transform: none;
     }
   }
 
-  @keyframes ticker-scroll {
-    from { transform: translateX(0); }
-    to { transform: translateX(-50%); }
-  }
-
-  @keyframes shimmer {
-    0% { background-position: -1000px 0; }
-    100% { background-position: 1000px 0; }
-  }
-
   .animate-in {
-    animation-name: enter;
-    animation-duration: 150ms;
-    animation-fill-mode: both;
-    animation-timing-function: cubic-bezier(0.16, 1, 0.3, 1);
+    animation: enter 0.35s ease;
   }
 
-  .fade-in { --tw-enter-opacity: 0; }
-  .zoom-in-95 { --tw-enter-scale: 0.95; }
+  @keyframes ticker-scroll {
+    from {
+      transform: translateX(0);
+    }
+
+    to {
+      transform: translateX(-50%);
+    }
+  }
 
   .ticker-track {
     width: max-content;
+
     animation: ticker-scroll 38s linear infinite;
   }
 
-.shimmer {
-    background: linear-gradient(
-      90deg,
-      #F5F7FA 25%,
-      #FAF9F7 50%,
-      #F5F7FA 75% /* 👈 Fixed to percentage */
-    );
+  @keyframes shimmer {
+    0% {
+      background-position: -1000px 0;
+    }
+
+    100% {
+      background-position: 1000px 0;
+    }
+  }
+
+  .shimmer {
+    background: linear-gradient(90deg, #f5f7fa 25%, #ffffff 50%, #f5f7fa 75%);
+
     background-size: 1000px 100%;
+
     animation: shimmer 2s infinite;
   }
-  
+
   @media (prefers-reduced-motion: reduce) {
-    .ticker-track, .shimmer {
+    .ticker-track,
+    .shimmer {
       animation: none;
     }
   }

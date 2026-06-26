@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
+from schemas import ManualInjectRequest
+from ledger import process_evidence
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 from fastapi import Depends, FastAPI, Form, HTTPException, status
@@ -14,15 +16,31 @@ from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import func, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
+from sqlalchemy.orm import joinedload
+
 
 from database import Base, SessionLocal, engine, get_db
+from domain import (
+    DEFAULT_COORDINATES_BY_DISTRICT,
+    DEPARTMENT_BY_INFRASTRUCTURE_TYPE,
+    DEPARTMENT_CODES,
+    HIMACHAL_ADMIN_HIERARCHY,
+    SLA_HOURS_BY_PRIORITY,
+    allocate_department_name as resolve_department_name,
+    evaluate_priority as resolve_priority,
+)
+from bridge import run_live_transit_bridge
 from ingestor import build_ingestion_service
 from security import hash_password, verify_password
 import models
 from models import (
+    Asset,
+    Incident,
+    EventStateTransition,
     Category,
     Citizen,
     CitizenVeto,
+    Evidence,
     CulturalAsset,
     Department,
     District,
@@ -41,70 +59,6 @@ MONSOON_COMMAND_STATE = os.getenv("MONSOON_COMMAND_STATE", "ACTIVE")
 UPVOTE_CRITICAL_THRESHOLD = 30
 ACTIVE_STATUSES = ("Pending", "Under Verification", "In Progress", "Reopened via Citizen Veto")
 SLA_MONITOR_INTERVAL_SECONDS = 60
-
-HIMACHAL_ADMIN_HIERARCHY: Dict[str, Dict[str, List[str]]] = {
-    "Kullu": {
-        "Anni": ["Draman", "Kungash", "Lajheri"],
-        "Bhuntar": ["Bari", "Sainj", "Jari"],
-        "Nirmand": ["Arsu", "Deem", "Bagi Sarahan"],
-    },
-    "Mandi": {
-        "Seraj": ["Bali Chowki", "Thunag", "Janjehli"],
-        "Drang": ["Katindhi", "Pali", "Uhal"],
-        "Balh": ["Kummi", "Gagal", "Ratti"],
-    },
-    "Shimla": {
-        "Rohru": ["Chirgaon", "Samoli", "Pujarli"],
-        "Mashobra": ["Baldeyan", "Bhont", "Dhalli"],
-        "Theog": ["Matiana", "Kiari", "Deha"],
-    },
-    "Kangra": {
-        "Baijnath": ["Paprola", "Bir", "Kothi Kohar"],
-        "Dharamshala": ["Rakkar", "Tang Narwana", "Sidhpur"],
-        "Nurpur": ["Rehan", "Sadwan", "Bassa Waziran"],
-    },
-    "Lahaul & Spiti": {
-        "Keylong": ["Sissu", "Gondhla", "Jispa"],
-        "Kaza": ["Kibber", "Langza", "Tabo"],
-        "Udaipur": ["Triloknath", "Miyar", "Tindi"],
-    },
-}
-
-DEPARTMENT_BY_INFRASTRUCTURE_TYPE = {
-    "Connecting Bailey Bridge": "Public Works Department",
-    "Drinking Water Line": "Jal Shakti Vibhag",
-    "NH Highway Link": "National Highways Wing",
-    "Power Grid Substation": "HPSEBL Operations",
-}
-
-DEPARTMENT_CODES = {
-    "Public Works Department": "PWD",
-    "Jal Shakti Vibhag": "JSV",
-    "National Highways Wing": "NHW",
-    "HPSEBL Operations": "HPSEBL",
-}
-
-TERRAIN_PRIORITY = {
-    "Flash Flood Khud Proximity": "critical",
-    "Landslide Vulnerable Link": "high",
-    "High-Alpine Alpine Track": "high",
-    "Standard Rural Road": "medium",
-}
-
-SLA_HOURS_BY_PRIORITY = {
-    "critical": 8,
-    "high": 24,
-    "medium": 72,
-    "low": 72,
-}
-
-DEFAULT_COORDINATES_BY_DISTRICT = {
-    "Kullu": (31.9592, 77.1089),
-    "Mandi": (31.7087, 76.9320),
-    "Shimla": (31.1048, 77.1734),
-    "Kangra": (32.0998, 76.2691),
-    "Lahaul & Spiti": (32.6195, 77.3784),
-}
 
 sla_monitor_thread: Optional[threading.Thread] = None
 ingestion_scheduler: Optional[BackgroundScheduler] = None
@@ -139,6 +93,179 @@ app.add_middleware(
         "X-Requested-With",
     ],
 )
+
+def to_iso(dt):
+    return dt.isoformat() + "Z" if dt else None
+@app.get("/api/assets/{asset_id}/incidents")
+def get_asset_incidents(
+    asset_id: int,
+    db: Session = Depends(get_db)
+):
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id
+    ).first()
+
+    if not asset:
+        raise HTTPException(
+            status_code=404,
+            detail="Asset not found"
+        )
+
+    incidents = (
+        db.query(Incident)
+        .filter(Incident.asset_id == asset_id)
+        .order_by(Incident.created_at.desc())
+        .all()
+    )
+
+    return {
+        "asset": {
+            "id": asset.id,
+            "name": asset.name,
+            "asset_type": asset.asset_type,
+            "district": asset.district
+        },
+        "incidents": [
+            {
+                "incident_id": incident.id,
+                "event_type": incident.event_type,
+                "current_state": incident.current_state,
+                "created_at": incident.created_at.isoformat() + "Z"
+            }
+            for incident in incidents
+        ]
+    }
+
+@app.get("/api/assets/{asset_id}")
+def get_asset(asset_id: int, db: Session = Depends(get_db)):
+    asset = db.query(Asset).filter(
+        Asset.id == asset_id
+    ).first()
+
+    if not asset:
+        raise HTTPException(
+            status_code=404,
+            detail="Asset not found"
+        )
+
+    return {
+        "id": asset.id,
+        "name": asset.name,
+        "asset_type": asset.asset_type,
+        "district": asset.district,
+        "lat": asset.lat,
+        "lon": asset.lon
+    }
+
+@app.get("/api/incidents/{incident_id}")
+def get_incident(
+    incident_id: int,
+    db: Session = Depends(get_db)
+):
+    """Fetch complete Incident narrative, evidence trail and audit history."""
+
+    incident = (
+        db.query(Incident)
+        .filter(Incident.id == incident_id)
+        .first()
+    )
+
+    if not incident:
+        raise HTTPException(
+            status_code=404,
+            detail="Incident not found"
+        )
+
+    asset = db.query(Asset).filter(Asset.id == incident.asset_id).first()
+    if not asset:
+        raise HTTPException(
+            status_code=500, 
+            detail=f"Data Integrity Error: Asset {incident.asset_id} for incident {incident_id} not found."
+        )
+    
+    transitions = (
+    db.query(EventStateTransition)
+    .filter(
+        EventStateTransition.incident_id == incident.id
+    )
+    .order_by(EventStateTransition.created_at)
+    .all()
+    )
+
+    evidence_list = (
+    db.query(Evidence)
+    .options(joinedload(Evidence.source))
+    .filter(Evidence.incident_id == incident.id)
+    .order_by(Evidence.created_at.desc())
+    .all()
+    )
+
+    return {
+    "asset": {
+        "id": asset.id,
+        "name": asset.name,
+        "asset_type": asset.asset_type,
+        "district": asset.district,
+        "lat": asset.lat,
+        "lon": asset.lon,
+    },
+
+    "incident": {
+        "id": incident.id,
+        "asset_id": incident.asset_id,
+        "event_type": incident.event_type,
+        "current_state": incident.current_state,
+        "created_at": to_iso(incident.created_at),
+        "updated_at": to_iso(incident.updated_at),
+    },
+
+    "summary": {
+        "evidence_count": len(evidence_list),
+        "transition_count": len(transitions),
+        "current_status": incident.current_state,
+        "last_updated": to_iso(
+            incident.updated_at or incident.created_at
+        ),
+    },
+
+    "timeline": [
+        {
+            "from_state": t.from_state,
+            "to_state": t.to_state,
+            "actor": t.actor_type,
+            "reason": t.reason,
+            "created_at": to_iso(t.created_at),
+        }
+        for t in transitions
+    ],
+
+    "evidence": [
+        {
+            "source": e.source.name if e.source else "Unknown",
+            "evidence_type": e.evidence_type,
+            "summary": e.summary,
+            "created_at": to_iso(e.created_at),
+        }
+        for e in evidence_list
+    ],
+}
+
+@app.post("/api/incidents/manual-inject")
+def inject_incident(request: ManualInjectRequest, db: Session = Depends(get_db)):
+    incident = process_evidence(
+        db, 
+        request.asset_id, 
+        request.event_type, 
+        request.source_id, 
+        request.summary, 
+        {"note": request.summary}
+    )
+    return {
+    "status": "Incident updated",
+    "incident_id": incident.id,
+    "current_state": incident.current_state,
+    "updated_at": incident.updated_at.isoformat() + "Z",
+    }
 
 class OTPLoginRequest(BaseModel):
     phone: str = Field(..., min_length=10, max_length=15)
@@ -273,22 +400,22 @@ def validate_location_hierarchy(district: str, block: str, panchayat: str) -> No
         )
 
 def evaluate_priority(terrain_risk: str) -> str:
-    priority = TERRAIN_PRIORITY.get(terrain_risk)
-    if priority is None:
+    try:
+        return resolve_priority(terrain_risk)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"terrainRisk must be one of: {', '.join(TERRAIN_PRIORITY.keys())}.",
-        )
-    return priority
+            detail=str(exc),
+        ) from exc
 
 def allocate_department_name(infrastructure_type: str) -> str:
-    department_name = DEPARTMENT_BY_INFRASTRUCTURE_TYPE.get(infrastructure_type)
-    if department_name is None:
+    try:
+        return resolve_department_name(infrastructure_type)
+    except ValueError as exc:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            detail=f"infrastructureType must be one of: {', '.join(DEPARTMENT_BY_INFRASTRUCTURE_TYPE.keys())}.",
-        )
-    return department_name
+            detail=str(exc),
+        ) from exc
 
 def get_or_create_department(db: Session, department_name: str) -> Department:
     department = db.query(Department).filter(Department.name == department_name).first()
@@ -768,9 +895,16 @@ def start_sla_compliance_monitor() -> None:
         id="transit-ingestion",
         replace_existing=True,
     )
+    ingestion_scheduler.add_job(
+        run_live_transit_bridge,
+        trigger=IntervalTrigger(minutes=2),
+        id="live-emergency-bridge",
+        replace_existing=True,
+    )
     ingestion_scheduler.start()
     ingestion_service.run_weather_sync()
     ingestion_service.run_transit_sync()
+    run_live_transit_bridge()
 
 
 @app.on_event("shutdown")
