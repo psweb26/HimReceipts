@@ -33,7 +33,6 @@ import {
   ThumbsUp,
 } from "lucide-react";
 
-
 import HimachalVectorMap from "./components/HimachalVectorMap";
 import IdentityMosaic from "./components/IdentityMosaic";
 import himachalCrest from "./assets/himachal-crest.png";
@@ -44,8 +43,6 @@ const UPVOTE_CRITICAL_THRESHOLD = 30;
 const FLASH_FLOOD_RISK = "Flash Flood Khud Proximity";
 const CLOCK_INTERVAL_MS = 60_000;
 const APP_CLOCK_STARTED_AT_MS = new Date().getTime();
-
-
 
 const views = [
   {
@@ -100,7 +97,10 @@ const hpLocationMatrix = [
     district: "Kangra",
     blocks: [
       { block: "Baijnath", panchayats: ["Paprola", "Bir", "Kothi Kohar"] },
-      { block: "Dharamshala", panchayats: ["Rakkar", "Tang Narwana", "Sidhpur"] },
+      {
+        block: "Dharamshala",
+        panchayats: ["Rakkar", "Tang Narwana", "Sidhpur"],
+      },
       { block: "Nurpur", panchayats: ["Rehan", "Sadwan", "Bassa Waziran"] },
     ],
   },
@@ -260,7 +260,8 @@ const initialGrievances = [
     slaHours: 72,
     resolutionNotes:
       "Cross-drain cleared, shoulder packed, and runoff redirected with temporary stone pitching.",
-    validationImageUrl: "https://images.example.org/hp/mashobra-drainage-clearance.jpg",
+    validationImageUrl:
+      "https://images.example.org/hp/mashobra-drainage-clearance.jpg",
   }),
   createSeedGrievance({
     id: "HP-MON-2406",
@@ -366,8 +367,8 @@ function App() {
               resolutionNotes,
               validationImageUrl,
             }
-          : ticket
-      )
+          : ticket,
+      ),
     );
   }
 
@@ -381,8 +382,8 @@ function App() {
               vetoRemarks,
               vetoedAt: new Date().toISOString(),
             }
-          : ticket
-      )
+          : ticket,
+      ),
     );
   }
 
@@ -409,9 +410,7 @@ function App() {
         {activeView === "telemetry" && (
           <TelemetryPillar grievances={grievances} nowMs={nowMs} />
         )}
-        {activeView === "heritage" && (
-          <HeritagePillar />
-        )}
+        {activeView === "heritage" && <HeritagePillar />}
       </div>
     </main>
   );
@@ -433,7 +432,10 @@ function MonsoonAlertTicker() {
         <div className="min-w-0 flex-1 overflow-hidden">
           <div className="ticker-track flex gap-12 whitespace-nowrap text-[11px] font-bold uppercase tracking-wider">
             {[...bulletins, ...bulletins].map((bulletin, index) => (
-              <span className="inline-flex items-center gap-3" key={`${bulletin}-${index}`}>
+              <span
+                className="inline-flex items-center gap-3"
+                key={`${bulletin}-${index}`}
+              >
                 <span className="h-1.5 w-1.5 rounded-full bg-[var(--pahadi-crimson)] animate-pulse" />
                 {bulletin}
               </span>
@@ -497,10 +499,25 @@ function HeaderNavigation({ activeView, setActiveView }) {
                 )}
               >
                 <div className="flex items-center gap-2">
-                  <Icon className={cx("h-4 w-4 shrink-0", isActive ? "text-[var(--kinnaur-marigold)]" : "text-slate-400")} aria-hidden="true" />
-                  <span className="text-xs font-black uppercase tracking-wider">{view.label}</span>
+                  <Icon
+                    className={cx(
+                      "h-4 w-4 shrink-0",
+                      isActive
+                        ? "text-[var(--kinnaur-marigold)]"
+                        : "text-slate-400",
+                    )}
+                    aria-hidden="true"
+                  />
+                  <span className="text-xs font-black uppercase tracking-wider">
+                    {view.label}
+                  </span>
                 </div>
-                <span className={cx("text-[10px] font-medium", isActive ? "text-slate-300" : "text-slate-500")}>
+                <span
+                  className={cx(
+                    "text-[10px] font-medium",
+                    isActive ? "text-slate-300" : "text-slate-500",
+                  )}
+                >
                   {view.subtitle}
                 </span>
               </button>
@@ -508,13 +525,22 @@ function HeaderNavigation({ activeView, setActiveView }) {
           })}
         </div>
       </div>
-      
+
       <div className="himachali-weave-divider" />
     </div>
   );
 }
 
-function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVeto, nowMs, selectedDistrict, setSelectedDistrict }) {
+function CivicPillar({
+  grievances,
+  onCreateGrievance,
+  onUpvote,
+  onResolve,
+  onVeto,
+  nowMs,
+  selectedDistrict,
+  setSelectedDistrict,
+}) {
   const [form, setForm] = useState(() => {
     const firstDistrict = hpLocationMatrix[0];
     const firstBlock = firstDistrict.blocks[0];
@@ -540,14 +566,18 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
     (entry) => entry.district === form.district,
   );
   const blockOptions = selectedDistrictConfig?.blocks || [];
-  const selectedBlock = blockOptions.find((entry) => entry.block === form.block);
+  const selectedBlock = blockOptions.find(
+    (entry) => entry.block === form.block,
+  );
   const panchayatOptions = selectedBlock?.panchayats || [];
 
   const feed = useMemo(() => {
     let result = [...grievances];
-    
+
     if (selectedDistrict) {
-      result = result.filter(t => t.district.toLowerCase() === selectedDistrict.toLowerCase());
+      result = result.filter(
+        (t) => t.district.toLowerCase() === selectedDistrict.toLowerCase(),
+      );
     }
 
     return result.sort((left, right) => {
@@ -561,7 +591,9 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
       if (upvoteDelta !== 0) {
         return upvoteDelta;
       }
-      return new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime();
+      return (
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+      );
     });
   }, [grievances, selectedDistrict]);
 
@@ -574,11 +606,13 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
       const next = { ...current, [field]: value };
 
       if (field === "district") {
-        const district = hpLocationMatrix.find((entry) => entry.district === value);
+        const district = hpLocationMatrix.find(
+          (entry) => entry.district === value,
+        );
         const firstBlock = district?.blocks[0];
         next.block = firstBlock?.block || "";
         next.panchayat = firstBlock?.panchayats[0] || "";
-        
+
         if (setSelectedDistrict) {
           setSelectedDistrict(value);
         }
@@ -623,13 +657,19 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
             जन पुकार / Civic Accountability Dashboard
           </h2>
           <p className="text-xs text-slate-600 max-w-3xl leading-relaxed">
-            A decentralized oversight network enabling citizens to flag structural damage—inspired by regional engineering resilience. Track road shoulder failure, cracked retaining walls, or structural strain on critical infrastructure links before they escalate into transit blockades.
+            A decentralized oversight network enabling citizens to flag
+            structural damage—inspired by regional engineering resilience. Track
+            road shoulder failure, cracked retaining walls, or structural strain
+            on critical infrastructure links before they escalate into transit
+            blockades.
           </p>
         </div>
         <div className="w-32 h-20 shrink-0 bg-slate-100 rounded-sm border border-[var(--dry-wool)] flex flex-col items-center justify-center p-2 text-center text-[10px] font-bold text-slate-500 font-mono">
           <span>KATH-KUNI</span>
           <span className="text-lg mt-0.5">🪵🪨</span>
-          <span className="text-[8px] text-slate-400 font-sans mt-0.5">Structural Grid Pattern</span>
+          <span className="text-[8px] text-slate-400 font-sans mt-0.5">
+            Structural Grid Pattern
+          </span>
         </div>
       </div>
 
@@ -647,14 +687,18 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
                 <input
                   className={inputClass}
                   value={form.citizenName}
-                  onChange={(event) => updateForm("citizenName", event.target.value)}
+                  onChange={(event) =>
+                    updateForm("citizenName", event.target.value)
+                  }
                 />
               </Field>
               <Field label="District">
                 <select
                   className={inputClass}
                   value={form.district}
-                  onChange={(event) => updateForm("district", event.target.value)}
+                  onChange={(event) =>
+                    updateForm("district", event.target.value)
+                  }
                 >
                   {hpLocationMatrix.map((entry) => (
                     <option key={entry.district} value={entry.district}>
@@ -683,7 +727,9 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
                 <select
                   className={inputClass}
                   value={form.panchayat}
-                  onChange={(event) => updateForm("panchayat", event.target.value)}
+                  onChange={(event) =>
+                    updateForm("panchayat", event.target.value)
+                  }
                 >
                   {panchayatOptions.map((panchayat) => (
                     <option key={panchayat} value={panchayat}>
@@ -711,7 +757,9 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
                 <select
                   className={inputClass}
                   value={form.terrainRisk}
-                  onChange={(event) => updateForm("terrainRisk", event.target.value)}
+                  onChange={(event) =>
+                    updateForm("terrainRisk", event.target.value)
+                  }
                 >
                   {terrainRisks.map((risk) => (
                     <option key={risk} value={risk}>
@@ -735,7 +783,9 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
               <textarea
                 className={cx(inputClass, "min-h-32 resize-none")}
                 value={form.description}
-                onChange={(event) => updateForm("description", event.target.value)}
+                onChange={(event) =>
+                  updateForm("description", event.target.value)
+                }
               />
             </Field>
 
@@ -744,7 +794,9 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
                 className={inputClass}
                 placeholder="https://..."
                 value={form.intakePhotoUrl}
-                onChange={(event) => updateForm("intakePhotoUrl", event.target.value)}
+                onChange={(event) =>
+                  updateForm("intakePhotoUrl", event.target.value)
+                }
               />
             </Field>
 
@@ -761,7 +813,7 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
         </section>
 
         <div className="grid gap-6">
-          <HimachalVectorMap 
+          <HimachalVectorMap
             selectedDistrict={selectedDistrict}
             onSelectDistrict={setSelectedDistrict}
             grievances={grievances}
@@ -776,12 +828,18 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
 
             {latestFromState ? (
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <MetricPill label="Ticket Identification ID" value={latestFromState.id} />
+                <MetricPill
+                  label="Ticket Identification ID"
+                  value={latestFromState.id}
+                />
                 <MetricPill
                   label="Risk Priority Rank"
                   value={priorityLabel[getEffectivePriority(latestFromState)]}
                 />
-                <MetricPill label="Aggregated Upvotes" value={latestFromState.upvotes} />
+                <MetricPill
+                  label="Aggregated Upvotes"
+                  value={latestFromState.upvotes}
+                />
                 <MetricPill
                   label="SLA Target Boundary"
                   value={formatDateTime(latestFromState.slaDueAt)}
@@ -804,18 +862,45 @@ function CivicPillar({ grievances, onCreateGrievance, onUpvote, onResolve, onVet
 
           <section className="kathkuni-card bg-white p-6">
             <PanelHeader
-              eyebrow="Community Signal Feed"
+              eyebrow="Community Discovery"
               icon={ArrowBigUp}
-              title="Local Telemetry Feed Ledger"
+              title="Highest Supported Citizen Reports"
             />
+
+            <p className="mt-2 text-xs text-slate-500">
+              Community reported incidents ranked by public support. Reports
+              with the highest engagement surface first for greater visibility
+              and accountability.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <button className="rounded-full bg-[var(--devdar-forest)] px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-white">
+                🔥 Trending
+              </button>
+
+              <button className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50">
+                Latest
+              </button>
+
+              <button className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50">
+                Most Supported
+              </button>
+
+              <button className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50">
+                Pending
+              </button>
+            </div>
 
             <div className="mt-5 grid gap-3.5 max-h-96 overflow-y-auto pr-1">
               {feed.slice(0, 5).map((ticket) => (
                 <GrievanceFeedCard
                   key={ticket.id}
                   onUpvote={onUpvote}
-                  onSelectResolve={() => setSelectedTicket({ ...ticket, action: 'resolve' })}
-                  onSelectVeto={() => setSelectedTicket({ ...ticket, action: 'veto' })}
+                  onSelectResolve={() =>
+                    setSelectedTicket({ ...ticket, action: "resolve" })
+                  }
+                  onSelectVeto={() =>
+                    setSelectedTicket({ ...ticket, action: "veto" })
+                  }
                   ticket={ticket}
                 />
               ))}
@@ -858,31 +943,33 @@ function TelemetryPillar({ grievances, nowMs }) {
       throw new Error("Telemetry feed request failed.");
     }
 
-    return Promise.all([
-      weatherResponse.json(),
-      transitResponse.json(),
-    ]);
+    return Promise.all([weatherResponse.json(), transitResponse.json()]);
   }, []);
 
-  const loadTelemetry = useCallback(async (signal) => {
-    setRefreshing(true);
-    setTelemetryError("");
+  const loadTelemetry = useCallback(
+    async (signal) => {
+      setRefreshing(true);
+      setTelemetryError("");
 
-    try {
-      const [weatherPayload, transitPayload] = await requestTelemetry(signal);
+      try {
+        const [weatherPayload, transitPayload] = await requestTelemetry(signal);
 
-      setWeatherNodes(Array.isArray(weatherPayload) ? weatherPayload : []);
-      setTransitRoutes(Array.isArray(transitPayload) ? transitPayload : []);
-    } catch (error) {
-      if (error.name !== "AbortError") {
-        setTelemetryError(error.message || "Live telemetry feed is unavailable.");
+        setWeatherNodes(Array.isArray(weatherPayload) ? weatherPayload : []);
+        setTransitRoutes(Array.isArray(transitPayload) ? transitPayload : []);
+      } catch (error) {
+        if (error.name !== "AbortError") {
+          setTelemetryError(
+            error.message || "Live telemetry feed is unavailable.",
+          );
+        }
+      } finally {
+        if (!signal?.aborted) {
+          setRefreshing(false);
+        }
       }
-    } finally {
-      if (!signal?.aborted) {
-        setRefreshing(false);
-      }
-    }
-  }, [requestTelemetry]);
+    },
+    [requestTelemetry],
+  );
 
   useEffect(() => {
     const controller = new AbortController();
@@ -894,7 +981,9 @@ function TelemetryPillar({ grievances, nowMs }) {
       })
       .catch((error) => {
         if (error.name !== "AbortError") {
-          setTelemetryError(error.message || "Live telemetry feed is unavailable.");
+          setTelemetryError(
+            error.message || "Live telemetry feed is unavailable.",
+          );
         }
       })
       .finally(() => {
@@ -960,15 +1049,19 @@ function TelemetryPillar({ grievances, nowMs }) {
     const peak = weatherNodes.reduce(
       (currentPeak, node) => {
         const rainfall = asNumber(node.rainfall_1hr_mm);
-        return rainfall > currentPeak.rainfall ? { node, rainfall } : currentPeak;
+        return rainfall > currentPeak.rainfall
+          ? { node, rainfall }
+          : currentPeak;
       },
       { node: null, rainfall: 0 },
     );
 
     const averageTemperature =
       weatherNodes.length > 0
-        ? weatherNodes.reduce((sum, node) => sum + asNumber(node.temperature_c), 0) /
-          weatherNodes.length
+        ? weatherNodes.reduce(
+            (sum, node) => sum + asNumber(node.temperature_c),
+            0,
+          ) / weatherNodes.length
         : 0;
 
     return {
@@ -995,7 +1088,9 @@ function TelemetryPillar({ grievances, nowMs }) {
     return {
       blocked: statusCounts.Blocked || 0,
       delayed: statusCounts.Delayed || 0,
-      disrupted: transitRoutes.filter((route) => route.current_status !== "Operational").length,
+      disrupted: transitRoutes.filter(
+        (route) => route.current_status !== "Operational",
+      ).length,
       operational: statusCounts.Operational || 0,
       suspended: statusCounts.Suspended || 0,
       totalRoutes: transitRoutes.length,
@@ -1004,31 +1099,35 @@ function TelemetryPillar({ grievances, nowMs }) {
 
   const topWeatherNodes = useMemo(() => {
     return [...weatherNodes]
-      .sort((a, b) => Number.parseFloat(b.rainfall_1hr_mm || 0) - Number.parseFloat(a.rainfall_1hr_mm || 0))
+      .sort(
+        (a, b) =>
+          Number.parseFloat(b.rainfall_1hr_mm || 0) -
+          Number.parseFloat(a.rainfall_1hr_mm || 0),
+      )
       .slice(0, 10);
   }, [weatherNodes]);
 
-const priorityTransitRoutes = useMemo(() => {
-  if (!transitRoutes || transitRoutes.length === 0) return [];
-  
-  const statusRank = {
-    blocked: 0,
-    suspended: 1,
-    delayed: 2,
-    operational: 3,
-  };
+  const priorityTransitRoutes = useMemo(() => {
+    if (!transitRoutes || transitRoutes.length === 0) return [];
 
-  return [...transitRoutes].sort((a, b) => {
-    const statusA = (a.current_status || "").toLowerCase();
-    const statusB = (b.current_status || "").toLowerCase();
-    return (statusRank[statusA] ?? 4) - (statusRank[statusB] ?? 4);
-  });
-}, [transitRoutes]);
+    const statusRank = {
+      blocked: 0,
+      suspended: 1,
+      delayed: 2,
+      operational: 3,
+    };
 
+    return [...transitRoutes].sort((a, b) => {
+      const statusA = (a.current_status || "").toLowerCase();
+      const statusB = (b.current_status || "").toLowerCase();
+      return (statusRank[statusA] ?? 4) - (statusRank[statusB] ?? 4);
+    });
+  }, [transitRoutes]);
 
   const weatherStatusStyles = {
     "Extreme Cloudburst": "border-rose-700 bg-rose-100 text-rose-900",
-    Cloudburst: "border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)]",
+    Cloudburst:
+      "border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)]",
     "Severe Rainfall": "border-orange-300 bg-orange-50 text-orange-900",
     "Heavy Rain": "border-amber-300 bg-amber-50 text-amber-950",
     "Moderate Rain": "border-sky-300 bg-sky-50 text-sky-900",
@@ -1036,12 +1135,13 @@ const priorityTransitRoutes = useMemo(() => {
     Normal: "border-emerald-200 bg-emerald-50 text-emerald-900",
   };
 
-const transitStatusStyles = {
-  operational: "border-emerald-200 bg-emerald-50 text-emerald-900",
-  delayed: "border-amber-300 bg-amber-50 text-amber-950",
-  blocked: "border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)]",
-  suspended: "border-slate-300 bg-slate-100 text-slate-800",
-};
+  const transitStatusStyles = {
+    operational: "border-emerald-200 bg-emerald-50 text-emerald-900",
+    delayed: "border-amber-300 bg-amber-50 text-amber-950",
+    blocked:
+      "border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)]",
+    suspended: "border-slate-300 bg-slate-100 text-slate-800",
+  };
 
   function refreshTelemetry() {
     loadTelemetry();
@@ -1072,7 +1172,15 @@ const transitStatusStyles = {
           />
           <div className="flex flex-wrap items-center gap-2">
             <span className="inline-flex h-9 items-center gap-2 rounded-xl border border-white/20 bg-white/10 px-3 text-[10px] font-black uppercase tracking-wider text-slate-100 backdrop-blur-sm">
-              <Radio className={cx("h-3.5 w-3.5", refreshing ? "animate-pulse text-[var(--him-marigold)]" : "text-emerald-300")} aria-hidden="true" />
+              <Radio
+                className={cx(
+                  "h-3.5 w-3.5",
+                  refreshing
+                    ? "animate-pulse text-[var(--him-marigold)]"
+                    : "text-emerald-300",
+                )}
+                aria-hidden="true"
+              />
               {refreshing ? "Syncing" : "Live Feed"}
             </span>
             <button
@@ -1082,9 +1190,15 @@ const transitStatusStyles = {
               type="button"
             >
               {refreshing ? (
-                <Loader2 className="h-4 w-4 animate-spin text-[var(--him-marigold)]" aria-hidden="true" />
+                <Loader2
+                  className="h-4 w-4 animate-spin text-[var(--him-marigold)]"
+                  aria-hidden="true"
+                />
               ) : (
-                <RefreshCcw className="h-4 w-4 text-[var(--him-marigold)]" aria-hidden="true" />
+                <RefreshCcw
+                  className="h-4 w-4 text-[var(--him-marigold)]"
+                  aria-hidden="true"
+                />
               )}
               Sync Feeds
             </button>
@@ -1144,11 +1258,26 @@ const transitStatusStyles = {
         </div>
 
         <div className="mt-4 grid gap-2 md:grid-cols-5">
-          <MetricPill label="Peak Rain Node" value={weatherSummary.peakStation} />
-          <MetricPill label="Average Temperature" value={`${Number(weatherSummary.averageTemperature.toFixed(1))}C`} />
-          <MetricPill label="Slope Sensor Signals" value={weatherSummary.slopeSignals} />
-          <MetricPill label="Operational Routes" value={transitSummary.operational} />
-          <MetricPill label="Blocked / Suspended" value={`${transitSummary.blocked} / ${transitSummary.suspended}`} />
+          <MetricPill
+            label="Peak Rain Node"
+            value={weatherSummary.peakStation}
+          />
+          <MetricPill
+            label="Average Temperature"
+            value={`${Number(weatherSummary.averageTemperature.toFixed(1))}C`}
+          />
+          <MetricPill
+            label="Slope Sensor Signals"
+            value={weatherSummary.slopeSignals}
+          />
+          <MetricPill
+            label="Operational Routes"
+            value={transitSummary.operational}
+          />
+          <MetricPill
+            label="Blocked / Suspended"
+            value={`${transitSummary.blocked} / ${transitSummary.suspended}`}
+          />
         </div>
       </section>
 
@@ -1175,11 +1304,17 @@ const transitStatusStyles = {
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white text-xs">
                   {topWeatherNodes.map((node) => (
-                    <tr key={node.id ?? node.station_name} className="align-top">
+                    <tr
+                      key={node.id ?? node.station_name}
+                      className="align-top"
+                    >
                       <td className="px-3 py-3">
-                        <p className="font-black text-[var(--devdar-forest)]">{node.station_name}</p>
+                        <p className="font-black text-[var(--devdar-forest)]">
+                          {node.station_name}
+                        </p>
                         <p className="mt-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                          {node.district} / {node.terrain_type} / {node.elevation_m}m
+                          {node.district} / {node.terrain_type} /{" "}
+                          {node.elevation_m}m
                         </p>
                       </td>
                       <td className="px-3 py-3 font-mono font-black tabular-nums text-slate-900">
@@ -1193,7 +1328,13 @@ const transitStatusStyles = {
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex flex-col gap-1">
-                          <span className={cx("inline-flex w-fit items-center rounded-xs border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider", weatherStatusStyles[node.dashboard_status] ?? weatherStatusStyles.Normal)}>
+                          <span
+                            className={cx(
+                              "inline-flex w-fit items-center rounded-xs border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider",
+                              weatherStatusStyles[node.dashboard_status] ??
+                                weatherStatusStyles.Normal,
+                            )}
+                          >
                             {node.dashboard_status || "Normal"}
                           </span>
                           <span className="text-[10px] font-bold text-slate-500">
@@ -1208,7 +1349,10 @@ const transitStatusStyles = {
                   ))}
                   {topWeatherNodes.length === 0 && (
                     <tr>
-                      <td className="px-3 py-6 text-center text-xs font-bold text-slate-500" colSpan={6}>
+                      <td
+                        className="px-3 py-6 text-center text-xs font-bold text-slate-500"
+                        colSpan={6}
+                      >
                         Weather telemetry feed is waiting for data.
                       </td>
                     </tr>
@@ -1241,27 +1385,41 @@ const transitStatusStyles = {
                       {route.origin} to {route.destination}
                     </p>
                   </div>
-                    <span className={cx(
-                      "shrink-0 rounded-xs border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider", 
-                      transitStatusStyles[(route.current_status || "").toLowerCase()] ?? "border-slate-200 bg-white text-slate-700"
-                      )}>
-                      {route.current_status || "Unknown"}
-                    </span>
+                  <span
+                    className={cx(
+                      "shrink-0 rounded-xs border px-2 py-0.5 text-[9px] font-black uppercase tracking-wider",
+                      transitStatusStyles[
+                        (route.current_status || "").toLowerCase()
+                      ] ?? "border-slate-200 bg-white text-slate-700",
+                    )}
+                  >
+                    {route.current_status || "Unknown"}
+                  </span>
                 </div>
 
                 <div className="mt-3 grid gap-2 text-[10px] font-semibold text-slate-600 sm:grid-cols-2">
                   <div className="rounded-sm border border-slate-200 bg-white p-2">
-                    <p className="font-black uppercase tracking-wider text-slate-400">Hazard Zone</p>
-                    <p className="mt-1 text-slate-700">{route.key_hazard_zone}</p>
+                    <p className="font-black uppercase tracking-wider text-slate-400">
+                      Hazard Zone
+                    </p>
+                    <p className="mt-1 text-slate-700">
+                      {route.key_hazard_zone}
+                    </p>
                   </div>
                   <div className="rounded-sm border border-slate-200 bg-white p-2">
-                    <p className="font-black uppercase tracking-wider text-slate-400">Relay</p>
-                    <p className="mt-1 text-slate-700">{route.relay_state || "Jagrit"}</p>
+                    <p className="font-black uppercase tracking-wider text-slate-400">
+                      Relay
+                    </p>
+                    <p className="mt-1 text-slate-700">
+                      {route.relay_state || "Jagrit"}
+                    </p>
                   </div>
                 </div>
 
                 <p className="mt-3 text-[11px] font-medium leading-relaxed text-slate-600">
-                  {route.roznamcha_remarks || route.hazard_profile || "No route remarks posted."}
+                  {route.roznamcha_remarks ||
+                    route.hazard_profile ||
+                    "No route remarks posted."}
                 </p>
               </article>
             ))}
@@ -1283,10 +1441,22 @@ const transitStatusStyles = {
           />
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
-            <MetricPill label="Total Log Registry" value={metrics.totalGrievances} />
-            <MetricPill label="Critical Emergencies" value={metrics.highUpvoteEmergencies} />
-            <MetricPill label="Active Pending Queue" value={metrics.activePending} />
-            <MetricPill label="Verified Resolved" value={metrics.verifiedResolved} />
+            <MetricPill
+              label="Total Log Registry"
+              value={metrics.totalGrievances}
+            />
+            <MetricPill
+              label="Critical Emergencies"
+              value={metrics.highUpvoteEmergencies}
+            />
+            <MetricPill
+              label="Active Pending Queue"
+              value={metrics.activePending}
+            />
+            <MetricPill
+              label="Verified Resolved"
+              value={metrics.verifiedResolved}
+            />
           </div>
         </section>
 
@@ -1299,15 +1469,49 @@ const transitStatusStyles = {
 
           <div className="mt-5 h-80 rounded-sm border border-[var(--dry-wool)] bg-[#F5F7FA] p-4">
             <ResponsiveContainer height="100%" width="100%">
-              <BarChart data={districtLoadData} margin={{ left: -15, right: 8 }}>
+              <BarChart
+                data={districtLoadData}
+                margin={{ left: -15, right: 8 }}
+              >
                 <CartesianGrid stroke="#E2E8F0" strokeDasharray="3 3" />
-                <XAxis dataKey="district" fontSize={11} stroke="#475569" tickLine={false} />
-                <YAxis allowDecimals={false} fontSize={11} stroke="#475569" tickLine={false} />
-                <Tooltip contentStyle={{ background: "#FFFFFF", border: "1px solid var(--dry-wool)", borderRadius: 4 }} />
+                <XAxis
+                  dataKey="district"
+                  fontSize={11}
+                  stroke="#475569"
+                  tickLine={false}
+                />
+                <YAxis
+                  allowDecimals={false}
+                  fontSize={11}
+                  stroke="#475569"
+                  tickLine={false}
+                />
+                <Tooltip
+                  contentStyle={{
+                    background: "#FFFFFF",
+                    border: "1px solid var(--dry-wool)",
+                    borderRadius: 4,
+                  }}
+                />
                 <Legend />
-                <Bar dataKey="Total" fill="var(--devdar-forest)" radius={[2, 2, 0, 0]} name="Total Registry" />
-                <Bar dataKey="HighUpvote" fill="var(--pahadi-crimson)" name="Critical Threat Alerts" radius={[2, 2, 0, 0]} />
-                <Bar dataKey="LandslideBridge" fill="var(--kinnaur-marigold)" name="Landslide/Bridge Blockades" radius={[2, 2, 0, 0]} />
+                <Bar
+                  dataKey="Total"
+                  fill="var(--devdar-forest)"
+                  radius={[2, 2, 0, 0]}
+                  name="Total Registry"
+                />
+                <Bar
+                  dataKey="HighUpvote"
+                  fill="var(--pahadi-crimson)"
+                  name="Critical Threat Alerts"
+                  radius={[2, 2, 0, 0]}
+                />
+                <Bar
+                  dataKey="LandslideBridge"
+                  fill="var(--kinnaur-marigold)"
+                  name="Landslide/Bridge Blockades"
+                  radius={[2, 2, 0, 0]}
+                />
               </BarChart>
             </ResponsiveContainer>
           </div>
@@ -1327,8 +1531,37 @@ function HeritagePillar() {
   const [liveAssets, setLiveAssets] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const uniqueDistricts = ["All", "Mandi", "Kullu", "Kinnaur", "Lahaul & Spiti", "Chamba", "Kangra", "Shimla", "Sirmaur", "Bilaspur", "Una & Hamirpur", "Solan"];
-  const uniqueCategories = ["All", "State Identity", "Geography & Peaks", "Rivers & Waterways", "Valleys & Canyons", "Famous Hill Stations", "Hidden Gems & Passes", "Famous Lakes", "Temples & Monasteries", "Eco Systems & Wildlife", "Cuisine & Dham", "Agriculture & Crops", "Languages & Attire", "Performing Arts & Fairs", "Architecture & Heritage"];
+  const uniqueDistricts = [
+    "All",
+    "Mandi",
+    "Kullu",
+    "Kinnaur",
+    "Lahaul & Spiti",
+    "Chamba",
+    "Kangra",
+    "Shimla",
+    "Sirmaur",
+    "Bilaspur",
+    "Una & Hamirpur",
+    "Solan",
+  ];
+  const uniqueCategories = [
+    "All",
+    "State Identity",
+    "Geography & Peaks",
+    "Rivers & Waterways",
+    "Valleys & Canyons",
+    "Famous Hill Stations",
+    "Hidden Gems & Passes",
+    "Famous Lakes",
+    "Temples & Monasteries",
+    "Eco Systems & Wildlife",
+    "Cuisine & Dham",
+    "Agriculture & Crops",
+    "Languages & Attire",
+    "Performing Arts & Fairs",
+    "Architecture & Heritage",
+  ];
 
   useEffect(() => {
     fetch("http://localhost:8000/api/cultural-assets")
@@ -1341,10 +1574,13 @@ function HeritagePillar() {
         setIsLoading(false);
       })
       .catch((err) => {
-        console.error("API Fetch blocked, utilizing static file backup registry:", err);
-        const mappedFallback = COMPREHENSIVE_HERITAGE_REGISTRY.map(asset => ({
+        console.error(
+          "API Fetch blocked, utilizing static file backup registry:",
+          err,
+        );
+        const mappedFallback = COMPREHENSIVE_HERITAGE_REGISTRY.map((asset) => ({
           ...asset,
-          sub_items: asset.subItems || []
+          sub_items: asset.subItems || [],
         }));
         setLiveAssets(mappedFallback);
         setIsLoading(false);
@@ -1353,28 +1589,42 @@ function HeritagePillar() {
 
   const filteredAssets = useMemo(() => {
     return liveAssets.filter((asset) => {
-      const matchesSearch = 
+      const matchesSearch =
         asset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         asset.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (asset.specification && asset.specification.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (asset.pillar_category && asset.pillar_category.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        (asset.sub_items && asset.sub_items.some(sub => 
-          sub.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-          sub.detail.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          sub.spec.toLowerCase().includes(searchQuery.toLowerCase())
-        ));
-      
-      const matchesDistrict = selectedDistrictFilter === "All" || 
-        asset.title.includes(selectedDistrictFilter) || 
-        asset.description.includes(selectedDistrictFilter) || 
-        (asset.specification && asset.specification.includes(selectedDistrictFilter)) ||
-        (asset.sub_items && asset.sub_items.some(sub => 
-          sub.name.includes(selectedDistrictFilter) || 
-          sub.detail.includes(selectedDistrictFilter) || 
-          sub.spec.includes(selectedDistrictFilter)
-        ));
-        
-      const matchesCategory = selectedCategoryFilter === "All" || asset.pillar_category === selectedCategoryFilter;
+        (asset.specification &&
+          asset.specification
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())) ||
+        (asset.pillar_category &&
+          asset.pillar_category
+            .toLowerCase()
+            .includes(searchQuery.toLowerCase())) ||
+        (asset.sub_items &&
+          asset.sub_items.some(
+            (sub) =>
+              sub.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              sub.detail.toLowerCase().includes(searchQuery.toLowerCase()) ||
+              sub.spec.toLowerCase().includes(searchQuery.toLowerCase()),
+          ));
+
+      const matchesDistrict =
+        selectedDistrictFilter === "All" ||
+        asset.title.includes(selectedDistrictFilter) ||
+        asset.description.includes(selectedDistrictFilter) ||
+        (asset.specification &&
+          asset.specification.includes(selectedDistrictFilter)) ||
+        (asset.sub_items &&
+          asset.sub_items.some(
+            (sub) =>
+              sub.name.includes(selectedDistrictFilter) ||
+              sub.detail.includes(selectedDistrictFilter) ||
+              sub.spec.includes(selectedDistrictFilter),
+          ));
+
+      const matchesCategory =
+        selectedCategoryFilter === "All" ||
+        asset.pillar_category === selectedCategoryFilter;
 
       return matchesSearch && matchesDistrict && matchesCategory;
     });
@@ -1387,7 +1637,11 @@ function HeritagePillar() {
 
   const handlePrevSlide = () => {
     if (!activeDeckAsset?.sub_items) return;
-    setCarouselIndex((prev) => (prev - 1 + activeDeckAsset.sub_items.length) % activeDeckAsset.sub_items.length);
+    setCarouselIndex(
+      (prev) =>
+        (prev - 1 + activeDeckAsset.sub_items.length) %
+        activeDeckAsset.sub_items.length,
+    );
   };
 
   if (isLoading) {
@@ -1412,14 +1666,20 @@ function HeritagePillar() {
             हमारी विरासत / Cultural Asset Canvas Registry
           </h2>
           <p className="text-xs text-slate-600 max-w-4xl leading-relaxed">
-            Himachal Pradesh is an extensive Western Himalayan cultural mosaic of Hindu, Buddhist, and indigenous traditions. This single-window command panel acts as a public ledger anchoring civic utility infrastructure inside regional identities—tracking peaks, passes, traditional clothing, and slow-cooked Dham cooking systems.
+            Himachal Pradesh is an extensive Western Himalayan cultural mosaic
+            of Hindu, Buddhist, and indigenous traditions. This single-window
+            command panel acts as a public ledger anchoring civic utility
+            infrastructure inside regional identities—tracking peaks, passes,
+            traditional clothing, and slow-cooked Dham cooking systems.
           </p>
         </div>
         <div className="w-40 h-20 shrink-0 bg-gradient-to-br from-[var(--pahadi-crimson)] via-[var(--kinnaur-marigold)] to-[var(--devdar-forest)] rounded-sm p-0.5 shadow-2xs">
           <div className="w-full h-full bg-white rounded-3xs flex flex-col items-center justify-center p-2 text-center text-[10px] font-mono font-black text-slate-700">
             <span>MOSAIC ECO REGISTRY</span>
             <span className="text-base mt-0.5">🏔️🧵🍲</span>
-            <span className="text-[8px] text-slate-400 font-sans mt-0.5 font-normal">28 Pillars Active</span>
+            <span className="text-[8px] text-slate-400 font-sans mt-0.5 font-normal">
+              28 Pillars Active
+            </span>
           </div>
         </div>
       </div>
@@ -1434,7 +1694,7 @@ function HeritagePillar() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           {searchQuery && (
-            <button 
+            <button
               onClick={() => setSearchQuery("")}
               className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 text-xs font-black font-mono"
             >
@@ -1449,8 +1709,10 @@ function HeritagePillar() {
             value={selectedDistrictFilter}
             onChange={(e) => setSelectedDistrictFilter(e.target.value)}
           >
-            {uniqueDistricts.map(dist => (
-              <option key={dist} value={dist}>{dist === "All" ? "📍 Global State Matrix" : `🏔️ ${dist} Query`}</option>
+            {uniqueDistricts.map((dist) => (
+              <option key={dist} value={dist}>
+                {dist === "All" ? "📍 Global State Matrix" : `🏔️ ${dist} Query`}
+              </option>
             ))}
           </select>
         </div>
@@ -1461,8 +1723,10 @@ function HeritagePillar() {
             value={selectedCategoryFilter}
             onChange={(e) => setSelectedCategoryFilter(e.target.value)}
           >
-            {uniqueCategories.map(cat => (
-              <option key={cat} value={cat}>{cat === "All" ? "✨ All Axis Dimensions" : cat}</option>
+            {uniqueCategories.map((cat) => (
+              <option key={cat} value={cat}>
+                {cat === "All" ? "✨ All Axis Dimensions" : cat}
+              </option>
             ))}
           </select>
         </div>
@@ -1480,7 +1744,7 @@ function HeritagePillar() {
 
       {/* 🚀 HIGH-FIDELITY GLASSMORPHISM TINDER-STYLE CAROUSEL DECK MODAL */}
       {activeDeckAsset && activeDeckAsset.sub_items && (
-        <SwipeModal 
+        <SwipeModal
           activeDeckAsset={activeDeckAsset}
           setActiveDeckAsset={setActiveDeckAsset}
           carouselIndex={carouselIndex}
@@ -1493,13 +1757,13 @@ function HeritagePillar() {
   );
 }
 
-function SwipeModal({ 
-  activeDeckAsset, 
-  setActiveDeckAsset, 
-  carouselIndex, 
-  setCarouselIndex, 
-  handlePrevSlide, 
-  handleNextSlide 
+function SwipeModal({
+  activeDeckAsset,
+  setActiveDeckAsset,
+  carouselIndex,
+  setCarouselIndex,
+  handlePrevSlide,
+  handleNextSlide,
 }) {
   const [dragStartX, setDragStartX] = useState(null);
   const [dragCurrentX, setDragCurrentX] = useState(0);
@@ -1509,10 +1773,10 @@ function SwipeModal({
   const nextIndex = (carouselIndex + 1) % totalItems;
   const prevIndex = (carouselIndex - 1 + totalItems) % totalItems;
 
-  const swipeThreshold = 140; 
+  const swipeThreshold = 140;
   const currentOffsetX = isDragging ? dragCurrentX - dragStartX : 0;
   const swipeProgress = Math.min(Math.abs(currentOffsetX) / swipeThreshold, 1);
-  
+
   const isLeftSwipeActive = currentOffsetX < -15;
   const isRightSwipeActive = currentOffsetX > 15;
 
@@ -1529,27 +1793,28 @@ function SwipeModal({
   const handleDragEnd = () => {
     if (!isDragging) return;
     setIsDragging(false);
-    
+
     if (currentOffsetX > swipeThreshold) {
       handlePrevSlide();
     } else if (currentOffsetX < -swipeThreshold) {
       handleNextSlide();
     }
-    
+
     setDragStartX(null);
     setDragCurrentX(0);
   };
 
   const mainCardTransformStyle = {
     transform: `translateX(${currentOffsetX}px) rotate(${currentOffsetX * 0.05}deg)`,
-    transition: isDragging ? 'none' : 'transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
-    cursor: isDragging ? 'grabbing' : 'grab'
+    transition: isDragging
+      ? "none"
+      : "transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)",
+    cursor: isDragging ? "grabbing" : "grab",
   };
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/40 p-4 backdrop-blur-md animate-in fade-in duration-200">
       <section className="w-full max-w-xl rounded-xl border border-white/40 bg-white/70 backdrop-blur-2xl shadow-2xl overflow-hidden flex flex-col justify-between animate-in fade-in zoom-in-95 duration-200">
-        
         <div className="flex items-center justify-between gap-4 bg-white/30 border-b border-white/20 p-4">
           <div className="min-w-0">
             <span className="text-[9px] font-black tracking-widest text-[var(--kinnaur-marigold)] uppercase bg-amber-100/60 px-2 py-0.5 rounded-xs">
@@ -1571,7 +1836,7 @@ function SwipeModal({
 
         <div className="p-6 space-y-5">
           {/* 🪐 IMAGE GESTURE LAYER */}
-          <div 
+          <div
             className="w-full h-52 relative select-none touch-none rounded-lg"
             onMouseDown={(e) => handleDragStart(e.clientX)}
             onMouseMove={(e) => handleDragMove(e.clientX)}
@@ -1582,49 +1847,68 @@ function SwipeModal({
             onTouchEnd={handleDragEnd}
           >
             {isLeftSwipeActive && (
-              <div 
+              <div
                 className="absolute inset-0 rounded-lg border border-white/20 bg-white/40 pointer-events-none flex flex-col items-center justify-center p-4 text-center scale-95 transition-opacity"
                 style={{ opacity: swipeProgress * 0.7 }}
               >
-                <span className="text-3xl opacity-40 filter blur-xs">{activeDeckAsset.sub_items[nextIndex].icon || activeDeckAsset.icon}</span>
-                <span className="text-[10px] font-mono font-black uppercase tracking-wider text-slate-400 mt-2">Incoming Vector</span>
-                <h5 className="text-xs font-bold text-slate-500 line-clamp-1">{activeDeckAsset.sub_items[nextIndex].name}</h5>
+                <span className="text-3xl opacity-40 filter blur-xs">
+                  {activeDeckAsset.sub_items[nextIndex].icon ||
+                    activeDeckAsset.icon}
+                </span>
+                <span className="text-[10px] font-mono font-black uppercase tracking-wider text-slate-400 mt-2">
+                  Incoming Vector
+                </span>
+                <h5 className="text-xs font-bold text-slate-500 line-clamp-1">
+                  {activeDeckAsset.sub_items[nextIndex].name}
+                </h5>
               </div>
             )}
 
             {isRightSwipeActive && (
-              <div 
+              <div
                 className="absolute inset-0 rounded-lg border border-white/20 bg-white/40 pointer-events-none flex flex-col items-center justify-center p-4 text-center scale-95 transition-opacity"
                 style={{ opacity: swipeProgress * 0.7 }}
               >
-                <span className="text-3xl opacity-40 filter blur-xs">{activeDeckAsset.sub_items[prevIndex].icon || activeDeckAsset.icon}</span>
-                <span className="text-[10px] font-mono font-black uppercase tracking-wider text-slate-400 mt-2">Previous Vector</span>
-                <h5 className="text-xs font-bold text-slate-500 line-clamp-1">{activeDeckAsset.sub_items[prevIndex].name}</h5>
+                <span className="text-3xl opacity-40 filter blur-xs">
+                  {activeDeckAsset.sub_items[prevIndex].icon ||
+                    activeDeckAsset.icon}
+                </span>
+                <span className="text-[10px] font-mono font-black uppercase tracking-wider text-slate-400 mt-2">
+                  Previous Vector
+                </span>
+                <h5 className="text-xs font-bold text-slate-500 line-clamp-1">
+                  {activeDeckAsset.sub_items[prevIndex].name}
+                </h5>
               </div>
             )}
 
-            <div 
+            <div
               style={mainCardTransformStyle}
               className="absolute inset-0 bg-white/95 border border-white/50 shadow-md rounded-lg flex flex-col items-center justify-center p-4 text-center overflow-hidden"
             >
               {activeDeckAsset.sub_items[carouselIndex].img ? (
-                <img 
-                  src={activeDeckAsset.sub_items[carouselIndex].img} 
+                <img
+                  src={activeDeckAsset.sub_items[carouselIndex].img}
                   alt={activeDeckAsset.sub_items[carouselIndex].name}
                   className="w-full h-full object-cover pointer-events-none select-none"
                 />
               ) : (
                 <div className="text-slate-500 space-y-1 pointer-events-none select-none">
                   <span className="text-4xl filter drop-shadow-md block animate-pulse">
-                    {activeDeckAsset.sub_items[carouselIndex].icon || activeDeckAsset.icon}
+                    {activeDeckAsset.sub_items[carouselIndex].icon ||
+                      activeDeckAsset.icon}
                   </span>
-                  <span className="text-[10px] font-mono font-black uppercase tracking-wider block text-slate-600">Image Asset Layer Active</span>
+                  <span className="text-[10px] font-mono font-black uppercase tracking-wider block text-slate-600">
+                    Image Asset Layer Active
+                  </span>
                   <p className="text-[9px] font-sans text-slate-500 max-w-[260px] mx-auto leading-normal">
-                    Technical anchor setup allocated for {activeDeckAsset.sub_items[carouselIndex].name} asset file injections.
+                    Technical anchor setup allocated for{" "}
+                    {activeDeckAsset.sub_items[carouselIndex].name} asset file
+                    injections.
                   </p>
                 </div>
               )}
-              
+
               <div className="absolute bottom-3 right-3 bg-slate-950/70 backdrop-blur-xs text-white px-2.5 py-0.5 rounded-md font-mono text-[9px] font-bold tabular-nums border border-white/10 shadow-sm">
                 {carouselIndex + 1} / {totalItems}
               </div>
@@ -1633,7 +1917,9 @@ function SwipeModal({
 
           <div className="space-y-2 min-h-[95px] px-0.5 pointer-events-none select-none">
             <h3 className="text-sm font-black text-[var(--devdar-forest)] uppercase tracking-tight flex items-center gap-2">
-              <span className="text-xl">{activeDeckAsset.sub_items[carouselIndex].icon}</span>
+              <span className="text-xl">
+                {activeDeckAsset.sub_items[carouselIndex].icon}
+              </span>
               {activeDeckAsset.sub_items[carouselIndex].name}
             </h3>
             <p className="text-xs text-slate-700 leading-relaxed font-medium">
@@ -1658,7 +1944,7 @@ function SwipeModal({
               "px-3 py-1.5 rounded-md border text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-2xs active:scale-98",
               isRightSwipeActive
                 ? "bg-amber-500 border-amber-400 text-white ring-4 ring-amber-500/20 scale-105 shadow-md"
-                : "border-white/40 bg-white/60 text-slate-700 hover:bg-white/80"
+                : "border-white/40 bg-white/60 text-slate-700 hover:bg-white/80",
             )}
           >
             ← Prev Vector
@@ -1666,7 +1952,7 @@ function SwipeModal({
 
           <div className="flex gap-1.5 items-center">
             {activeDeckAsset.sub_items.map((_, dotIdx) => (
-              <button 
+              <button
                 key={dotIdx}
                 onClick={() => setCarouselIndex(dotIdx)}
                 className={`h-2 rounded-full transition-all duration-300 ${dotIdx === carouselIndex ? "bg-[var(--pahadi-crimson)] w-5 shadow-3xs" : "bg-slate-300 hover:bg-slate-400 w-2"}`}
@@ -1681,7 +1967,7 @@ function SwipeModal({
               "px-3 py-1.5 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 shadow-2xs active:scale-98",
               isLeftSwipeActive
                 ? "bg-emerald-600 text-white ring-4 ring-emerald-600/20 scale-105 shadow-md"
-                : "bg-[var(--devdar-forest)] text-white hover:bg-[#132B1F]"
+                : "bg-[var(--devdar-forest)] text-white hover:bg-[#132B1F]",
             )}
           >
             Next Slide →
@@ -1692,12 +1978,18 @@ function SwipeModal({
   );
 }
 
-function GrievanceFeedCard({ ticket, onUpvote, onSelectResolve, onSelectVeto }) {
+function GrievanceFeedCard({
+  ticket,
+  onUpvote,
+  onSelectResolve,
+  onSelectVeto,
+}) {
   const effectivePriority = getEffectivePriority(ticket);
   const isCluster = ticket.upvotes > UPVOTE_CRITICAL_THRESHOLD;
 
   const localPriorityStyles = {
-    critical: "border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)]",
+    critical:
+      "border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)]",
     high: "border-[var(--kinnaur-marigold)] bg-amber-50/60 text-amber-950",
     medium: "border-[var(--dry-wool)] bg-slate-50 text-slate-800",
     low: "border-slate-200 bg-slate-100 text-slate-600",
@@ -1707,7 +1999,8 @@ function GrievanceFeedCard({ ticket, onUpvote, onSelectResolve, onSelectVeto }) 
     Pending: "border-[var(--dry-wool)] bg-white text-slate-800",
     "Under Verification": "border-sky-300 bg-sky-50 text-sky-900",
     "Verified Resolved": "border-emerald-300 bg-emerald-50 text-emerald-900",
-    "Reopened via Citizen Veto": "border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)]",
+    "Reopened via Citizen Veto":
+      "border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)]",
   };
 
   return (
@@ -1715,10 +2008,20 @@ function GrievanceFeedCard({ ticket, onUpvote, onSelectResolve, onSelectVeto }) 
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1 space-y-1.5">
           <div className="flex flex-wrap items-center gap-1.5">
-            <span className={cx("inline-flex items-center border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-xs", localPriorityStyles[effectivePriority])}>
+            <span
+              className={cx(
+                "inline-flex items-center border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-xs",
+                localPriorityStyles[effectivePriority],
+              )}
+            >
               {priorityLabel[effectivePriority]}
             </span>
-            <span className={cx("inline-flex items-center border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-xs", localStatusStyles[ticket.status])}>
+            <span
+              className={cx(
+                "inline-flex items-center border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-xs",
+                localStatusStyles[ticket.status],
+              )}
+            >
               {ticket.status}
             </span>
             {isCluster && (
@@ -1802,7 +2105,9 @@ function ResolutionModal({ ticket, onClose, onResolve, onVeto }) {
         <div className="flex items-start justify-between gap-4 border-b border-[var(--dry-wool)] bg-[#F5F7FA] p-5">
           <div className="min-w-0">
             <p className="text-[10px] font-black uppercase tracking-widest text-slate-500">
-              {isVeto ? "Citizen Counter-Verification" : "Administrative Closing Ledger"}
+              {isVeto
+                ? "Citizen Counter-Verification"
+                : "Administrative Closing Ledger"}
             </p>
             <h2 className="mt-1 break-all text-sm font-mono font-black text-slate-900">
               📁 Ticket Ref: {ticket.id}
@@ -1870,10 +2175,16 @@ function ResolutionModal({ ticket, onClose, onResolve, onVeto }) {
                     className={inputClass}
                     placeholder="https://images.example.gov.in/hp/monsoon-evidence-clear.jpg"
                     value={validationImageUrl}
-                    onChange={(event) => validationImageUrl && setValidationImageUrl(event.target.value)}
+                    onChange={(event) =>
+                      validationImageUrl &&
+                      setValidationImageUrl(event.target.value)
+                    }
                   />
                   <div className="grid h-11 w-11 shrink-0 place-items-center rounded-sm border border-[var(--dry-wool)] bg-[#F5F7FA] text-slate-500 shadow-2xs">
-                    <ImagePlus className="h-4 w-4 text-[var(--devdar-forest)]" aria-hidden="true" />
+                    <ImagePlus
+                      className="h-4 w-4 text-[var(--devdar-forest)]"
+                      aria-hidden="true"
+                    />
                   </div>
                 </div>
               </Field>
@@ -1890,7 +2201,9 @@ function ResolutionModal({ ticket, onClose, onResolve, onVeto }) {
                 </button>
                 <button
                   className="inline-flex h-9 items-center justify-center gap-1.5 rounded-sm bg-[var(--devdar-forest)] px-4 text-xs font-bold uppercase tracking-wider text-[#F5F7FA] transition hover:bg-[#132B1F] disabled:opacity-50 shadow-2xs"
-                  disabled={!resolutionNotes.trim() || !validationImageUrl.trim()}
+                  disabled={
+                    !resolutionNotes.trim() || !validationImageUrl.trim()
+                  }
                   type="submit"
                 >
                   <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
@@ -1925,12 +2238,24 @@ function PanelHeader({ eyebrow, icon: Icon, title }) {
 
 function KpiCard({ icon: Icon, label, value, surface, tone }) {
   return (
-    <article className={cx("rounded-sm border p-4 shadow-2xs flex flex-col justify-between", surface)}>
+    <article
+      className={cx(
+        "rounded-sm border p-4 shadow-2xs flex flex-col justify-between",
+        surface,
+      )}
+    >
       <div className="flex items-start justify-between gap-3">
-        <p className="text-[11px] font-bold uppercase tracking-wider opacity-80 leading-tight">{label}</p>
-        <Icon className={cx("h-4 w-4 shrink-0 mt-0.5", tone)} aria-hidden="true" />
+        <p className="text-[11px] font-bold uppercase tracking-wider opacity-80 leading-tight">
+          {label}
+        </p>
+        <Icon
+          className={cx("h-4 w-4 shrink-0 mt-0.5", tone)}
+          aria-hidden="true"
+        />
       </div>
-      <p className={cx("mt-4 text-2xl font-black font-mono tabular-nums", tone)}>
+      <p
+        className={cx("mt-4 text-2xl font-black font-mono tabular-nums", tone)}
+      >
         {Number(value || 0).toLocaleString("en-IN")}
       </p>
     </article>
@@ -1953,7 +2278,9 @@ function MetricPill({ label, value }) {
 function Field({ label, children }) {
   return (
     <label className="grid gap-1.5 text-xs">
-      <span className="font-bold text-slate-700 uppercase tracking-tight text-[11px]">{label}</span>
+      <span className="font-bold text-slate-700 uppercase tracking-tight text-[11px]">
+        {label}
+      </span>
       {children}
     </label>
   );
@@ -1962,7 +2289,10 @@ function Field({ label, children }) {
 function InlineError({ message }) {
   return (
     <div className="flex items-start gap-2 rounded-sm border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-800">
-      <XCircle className="mt-0.5 h-4 w-4 shrink-0 text-[var(--pahadi-crimson)]" aria-hidden="true" />
+      <XCircle
+        className="mt-0.5 h-4 w-4 shrink-0 text-[var(--pahadi-crimson)]"
+        aria-hidden="true"
+      />
       <span className="font-medium">{message}</span>
     </div>
   );
@@ -1973,10 +2303,17 @@ function EmptyState({ icon: Icon, title, detail }) {
     <div className="mt-5 grid min-h-36 place-items-center rounded-sm border border-dashed border-[var(--dry-wool)] bg-[#F5F7FA] p-5 text-center">
       <div>
         <div className="mx-auto grid h-9 w-9 place-items-center rounded-sm border border-[var(--dry-wool)] bg-white text-slate-400 shadow-2xs">
-          <Icon className="h-4 w-4 text-[var(--devdar-forest)]" aria-hidden="true" />
+          <Icon
+            className="h-4 w-4 text-[var(--devdar-forest)]"
+            aria-hidden="true"
+          />
         </div>
-        <p className="mt-2.5 text-xs font-bold text-slate-800 uppercase tracking-wide">{title}</p>
-        <p className="mt-0.5 text-xs text-slate-500 max-w-xs mx-auto">{detail}</p>
+        <p className="mt-2.5 text-xs font-bold text-slate-800 uppercase tracking-wide">
+          {title}
+        </p>
+        <p className="mt-0.5 text-xs text-slate-500 max-w-xs mx-auto">
+          {detail}
+        </p>
       </div>
     </div>
   );
@@ -1992,7 +2329,9 @@ function calculateCompositeScore(ticket) {
 }
 
 function getEffectivePriority(ticket) {
-  return ticket.upvotes > UPVOTE_CRITICAL_THRESHOLD ? "critical" : ticket.priority;
+  return ticket.upvotes > UPVOTE_CRITICAL_THRESHOLD
+    ? "critical"
+    : ticket.priority;
 }
 
 function derivePriorityFromTerrain(terrainRisk) {
@@ -2055,7 +2394,9 @@ function formatSlaStatus(ticket, nowMs) {
   const minutes = Math.round(Math.abs(dueAtMs - nowMs) / 60_000);
   const duration = formatDuration(minutes);
 
-  return dueAtMs < nowMs ? `⚠️ Breached by ${duration}` : `⏳ ${duration} remaining`;
+  return dueAtMs < nowMs
+    ? `⚠️ Breached by ${duration}`
+    : `⏳ ${duration} remaining`;
 }
 
 function formatDuration(totalMinutes) {
