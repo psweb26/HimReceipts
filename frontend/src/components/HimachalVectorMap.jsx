@@ -41,15 +41,24 @@ export default function HimachalVectorMap({
 }) {
   const mapContainerRef = useRef(null);
   const [tooltip, setTooltip] = useState(null);
+
+  const filteredGrievances = useMemo(() => {
+  if (!selectedDistrict) return grievances;
+
+  return grievances.filter(
+    (g) => g.district === selectedDistrict
+  );
+}, [grievances, selectedDistrict]);
+
   const districtCounts = useMemo(() => {
-    const counts = {};
+  const counts = {};
 
-    grievances.forEach((g) => {
-      counts[g.district] = (counts[g.district] || 0) + 1;
-    });
+  grievances.forEach((g) => {
+    counts[g.district] = (counts[g.district] || 0) + 1;
+  });
 
-    return counts;
-  }, [grievances]);
+  return counts;
+}, [grievances]);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -185,14 +194,14 @@ export default function HimachalVectorMap({
           <p className="text-[10px] uppercase tracking-widest text-slate-500">
             Districts
           </p>
-          <h3 className="mt-2 text-2xl font-black">12</h3>
+          <h3 className="mt-2 text-2xl font-black">{selectedDistrict ? 1 : 12}</h3>
         </div>
 
         <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
           <p className="text-[10px] uppercase tracking-widest text-slate-500">
             Reports
           </p>
-          <h3 className="mt-2 text-2xl font-black">{grievances.length}</h3>
+          <h3 className="mt-2 text-2xl font-black">{filteredGrievances.length}</h3>
         </div>
 
         <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
@@ -200,7 +209,11 @@ export default function HimachalVectorMap({
             Critical
           </p>
           <h3 className="mt-2 text-2xl font-black text-red-600">
-            {grievances.filter((g) => g.priority === "critical").length}
+            {
+  filteredGrievances.filter(
+    (g) => g.priority === "critical"
+  ).length
+}
           </h3>
         </div>
 
