@@ -19,6 +19,21 @@ const DISTRICT_COLORS = {
   Kullu: "#EAD8DF", // Rhododendron Pink
 };
 
+const DISTRICT_GRADIENTS = {
+  Chamba: ["#DCE8FA", "#BDD3F4", "#8FB4E6", "#5E8DC8"],
+  Kangra: ["#F5DAD5", "#EDB8AC", "#D98D73", "#B85E38"],
+  Una: ["#E8F2D5", "#CFE3A5", "#AAC86A", "#7E9E45"],
+  Hamirpur: ["#FAE8BE", "#F2D68A", "#D7B357", "#A8812E"],
+  Bilaspur: ["#DCE8E3", "#BED3CB", "#8FB3A6", "#5D7F74"],
+  Solan: ["#E5F1E1", "#C6DEBD", "#93BC8C", "#5E885B"],
+  Sirmaur: ["#F0E1F6", "#DABBE8", "#B58DCB", "#8B5BA3"],
+  Shimla: ["#F8F1D8", "#EAD9A5", "#D3B86C", "#A8883E"],
+  Kinnaur: ["#F3DED5", "#E7BDAF", "#CB8E73", "#A95D43"],
+  "Lahaul & Spiti": ["#E5ECF7", "#C8D8F1", "#94B1DE", "#607FB8"],
+  Mandi: ["#E8DDD3", "#D6C2B0", "#B19171", "#88664C"],
+  Kullu: ["#F5E3EC", "#E5BED1", "#C989AE", "#99597C"],
+};
+
 const DISTRICT_NAME_MAP = {
   LahaulSpiti: "Lahaul & Spiti",
   Hamirpur: "Hamirpur",
@@ -43,22 +58,20 @@ export default function HimachalVectorMap({
   const [tooltip, setTooltip] = useState(null);
 
   const filteredGrievances = useMemo(() => {
-  if (!selectedDistrict) return grievances;
+    if (!selectedDistrict) return grievances;
 
-  return grievances.filter(
-    (g) => g.district === selectedDistrict
-  );
-}, [grievances, selectedDistrict]);
+    return grievances.filter((g) => g.district === selectedDistrict);
+  }, [grievances, selectedDistrict]);
 
   const districtCounts = useMemo(() => {
-  const counts = {};
+    const counts = {};
 
-  grievances.forEach((g) => {
-    counts[g.district] = (counts[g.district] || 0) + 1;
-  });
+    grievances.forEach((g) => {
+      counts[g.district] = (counts[g.district] || 0) + 1;
+    });
 
-  return counts;
-}, [grievances]);
+    return counts;
+  }, [grievances]);
 
   useEffect(() => {
     if (!mapContainerRef.current) return;
@@ -72,15 +85,24 @@ export default function HimachalVectorMap({
 
       const count = districtCounts[districtName] || 0;
 
-      let baseColor;
+      const shades = DISTRICT_GRADIENTS[districtName] ?? [
+        "#EEEEEE",
+        "#DDDDDD",
+        "#CCCCCC",
+        "#BBBBBB",
+      ];
 
-      if (count === 0) baseColor = DISTRICT_COLORS[district.id] || "#EAEAEA";
-      else if (count <= 2) baseColor = "#B7E4C7";
-      else if (count <= 4) baseColor = "#FFE08A";
-      else if (count <= 6) baseColor = "#F6AD55";
-      else baseColor = "#F56565";
+      const fillColor =
+        count <= 2
+          ? shades[0]
+          : count <= 4
+            ? shades[1]
+            : count <= 6
+              ? shades[2]
+              : shades[3];
 
-      district.style.fill = baseColor;
+      district.style.fill = fillColor;
+
       district.style.stroke = "#718096";
       district.style.strokeWidth = "1";
 
@@ -153,10 +175,28 @@ export default function HimachalVectorMap({
       district.addEventListener("mousemove", (e) => {
         const rect = mapContainerRef.current.getBoundingClientRect();
 
+        const TOOLTIP_WIDTH = 270;
+        const TOOLTIP_HEIGHT = 190;
+
+        let left = e.clientX - rect.left + 18;
+        let top = e.clientY - rect.top + 18;
+
+        if (left + TOOLTIP_WIDTH > rect.width) {
+          left = e.clientX - rect.left - TOOLTIP_WIDTH - 18;
+        }
+
+        if (left < 15) left = 15;
+
+        if (top + TOOLTIP_HEIGHT > rect.height) {
+          top = e.clientY - rect.top - TOOLTIP_HEIGHT - 18;
+        }
+
+        if (top < 15) top = 15;
+
         setTooltip((t) => ({
           ...t,
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
+          x: left,
+          y: top,
         }));
       });
     });
@@ -194,14 +234,18 @@ export default function HimachalVectorMap({
           <p className="text-[10px] uppercase tracking-widest text-slate-500">
             Districts
           </p>
-          <h3 className="mt-2 text-2xl font-black">{selectedDistrict ? 1 : 12}</h3>
+          <h3 className="mt-2 text-2xl font-black">
+            {selectedDistrict ? 1 : 12}
+          </h3>
         </div>
 
         <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
           <p className="text-[10px] uppercase tracking-widest text-slate-500">
             Reports
           </p>
-          <h3 className="mt-2 text-2xl font-black">{filteredGrievances.length}</h3>
+          <h3 className="mt-2 text-2xl font-black">
+            {filteredGrievances.length}
+          </h3>
         </div>
 
         <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
@@ -209,11 +253,7 @@ export default function HimachalVectorMap({
             Critical
           </p>
           <h3 className="mt-2 text-2xl font-black text-red-600">
-            {
-  filteredGrievances.filter(
-    (g) => g.priority === "critical"
-  ).length
-}
+            {filteredGrievances.filter((g) => g.priority === "critical").length}
           </h3>
         </div>
 
@@ -273,8 +313,9 @@ export default function HimachalVectorMap({
           <div
             className="absolute z-50 w-64 rounded-xl border border-stone-200 bg-white/95 backdrop-blur-sm shadow-2xl px-4 py-3 pointer-events-none"
             style={{
-              left: tooltip.x + 15,
-              top: tooltip.y + 15,
+              left: tooltip.x,
+              top: tooltip.y,
+              transform: "translate3d(0,0,0)",
             }}
           >
             <div className="flex items-center gap-2 mb-3">
