@@ -85,13 +85,22 @@ export default function HimachalVectorMap({
         district.style.filter = "brightness(1.08) saturate(1.08)";
         district.style.stroke = "#365C68";
 
+        const districtGrievances = grievances.filter(
+          (g) => g.district === districtName,
+        );
+
         const rect = mapContainerRef.current.getBoundingClientRect();
 
         setTooltip({
           x: e.clientX - rect.left,
           y: e.clientY - rect.top,
           district: districtName,
-          reports: districtCounts[districtName] || 0,
+          total: districtGrievances.length,
+          critical: districtGrievances.filter((g) => g.priority === "critical")
+            .length,
+          high: districtGrievances.filter((g) => g.priority === "high").length,
+          resolved: districtGrievances.filter((g) => g.status === "resolved")
+            .length,
         });
       });
 
@@ -108,7 +117,13 @@ export default function HimachalVectorMap({
 
         activeDistrict = district;
 
-        onSelectDistrict?.(DISTRICT_NAME_MAP[district.id] || district.id);
+        const clickedDistrict = DISTRICT_NAME_MAP[district.id] || district.id;
+
+        if (selectedDistrict === clickedDistrict) {
+          onSelectDistrict?.(null);
+        } else {
+          onSelectDistrict?.(clickedDistrict);
+        }
       });
 
       district.addEventListener("mouseleave", () => {
@@ -121,14 +136,16 @@ export default function HimachalVectorMap({
       });
 
       district.addEventListener("mousemove", (e) => {
+        const rect = mapContainerRef.current.getBoundingClientRect();
+
         setTooltip((t) => ({
           ...t,
-          x: e.clientX,
-          y: e.clientY,
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
         }));
       });
     });
-  }, [onSelectDistrict, districtCounts]);
+  }, [onSelectDistrict, selectedDistrict, districtCounts, grievances]);
 
   return (
     /* 1. Transformed to a masonry wood-stone structure card */
@@ -233,27 +250,51 @@ export default function HimachalVectorMap({
             </div>
           </div>
         </div>
-      </div>
-      {tooltip && (
-        <div
-          style={{
-            left: tooltip.x + 15,
-            top: tooltip.y + 15,
-          }}
-          className="..."
-        >
+        {tooltip && (
           <div
-            className="absolute z-50 rounded-lg border border-stone-200 bg-white px-3 py-2 shadow-xl text-sm pointer-events-none"
+            className="absolute z-50 w-64 rounded-xl border border-stone-200 bg-white/95 backdrop-blur-sm shadow-2xl px-4 py-3 pointer-events-none"
             style={{
               left: tooltip.x + 15,
               top: tooltip.y + 15,
             }}
           >
-            <p className="font-semibold">{tooltip.district}</p>
-            <p className="text-slate-500">{tooltip.reports} reports</p>
+            <div className="flex items-center gap-2 mb-3">
+              <MapPin className="h-4 w-4 text-[var(--devdar-forest)]" />
+              <h3 className="font-bold text-[15px] text-[var(--devdar-forest)]">
+                {tooltip.district}
+              </h3>
+            </div>
+
+            <div className="border-t border-stone-200 my-2" />
+
+            <div className="space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Total Reports</span>
+                <span className="font-semibold">{tooltip.total}</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-red-600">Critical</span>
+                <span className="font-semibold">{tooltip.critical}</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-amber-600">High</span>
+                <span className="font-semibold">{tooltip.high}</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-green-600">Resolved</span>
+                <span className="font-semibold">{tooltip.resolved}</span>
+              </div>
+            </div>
+
+            <div className="border-t border-stone-200 mt-3 pt-2 text-xs text-slate-500">
+              Click to filter district →
+            </div>
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
