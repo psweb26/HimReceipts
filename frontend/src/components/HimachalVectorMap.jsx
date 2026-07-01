@@ -77,7 +77,7 @@ export default function HimachalVectorMap({
 
       district.style.cursor = "pointer";
       district.style.transition =
-        "fill .22s ease, filter .22s ease, stroke .22s ease";
+        "fill .28s ease-in-out, stroke .28s ease-in-out, filter .28s ease-in-out";
       district.style.filter =
         "brightness(1.06) drop-shadow(0 0 6px rgba(80,120,140,.25))";
 
@@ -110,10 +110,16 @@ export default function HimachalVectorMap({
             DISTRICT_COLORS[activeDistrict.id] || "#EAEAEA";
 
           activeDistrict.style.stroke = "#718096";
+          activeDistrict.style.strokeWidth = "1";
+          activeDistrict.style.filter =
+            "brightness(1.06) drop-shadow(0 0 6px rgba(80,120,140,.25))";
         }
 
-        district.style.fill = "#C96A28"; // selected color
+        district.style.fill = "#C96A28";
         district.style.stroke = "#8B4513";
+        district.style.strokeWidth = "2";
+        district.style.filter =
+          "brightness(1.08) saturate(1.15) drop-shadow(0 0 10px rgba(201,106,40,.35))";
 
         activeDistrict = district;
 
