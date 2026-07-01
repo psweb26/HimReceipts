@@ -4,6 +4,7 @@ import { MapPin } from "lucide-react";
 // SVG coordinate boundaries for active regions
 import HimachalDistricts from "../assets/himachal_districts.svg?react";
 
+/*
 const DISTRICT_COLORS = {
   Chamba: "#C8D7F0", // Mist Blue
   Kangra: "#E7C8C2", // Apple Blossom
@@ -17,7 +18,7 @@ const DISTRICT_COLORS = {
   "Lahaul & Spiti": "#D7DDEB", // Glacier Blue
   Mandi: "#DCCFC3", // Cedar Wood
   Kullu: "#EAD8DF", // Rhododendron Pink
-};
+}; */
 
 const DISTRICT_GRADIENTS = {
   Chamba: ["#DCE8FA", "#BDD3F4", "#8FB4E6", "#5E8DC8"],
@@ -55,7 +56,7 @@ export default function HimachalVectorMap({
   grievances = [],
 }) {
   const mapContainerRef = useRef(null);
-  const [tooltip, setTooltip] = useState(null);
+  const [tooltip, setTooltip] = useState(null); 
 
   const filteredGrievances = useMemo(() => {
     if (!selectedDistrict) return grievances;
@@ -133,24 +134,40 @@ export default function HimachalVectorMap({
           resolved: districtGrievances.filter((g) => g.status === "resolved")
             .length,
         });
+
+    
       });
 
       district.addEventListener("click", () => {
         if (activeDistrict) {
-          activeDistrict.style.fill =
-            DISTRICT_COLORS[activeDistrict.id] || "#EAEAEA";
+          const previousDistrictName =
+            DISTRICT_NAME_MAP[activeDistrict.id] || activeDistrict.id;
+
+          const previousCount = districtCounts[previousDistrictName] || 0;
+
+          const previousShades = DISTRICT_GRADIENTS[previousDistrictName] ?? [
+            "#EEEEEE",
+            "#DDDDDD",
+            "#CCCCCC",
+            "#BBBBBB",
+          ];
+
+          const previousFill =
+            previousCount <= 2
+              ? previousShades[0]
+              : previousCount <= 4
+                ? previousShades[1]
+                : previousCount <= 6
+                  ? previousShades[2]
+                  : previousShades[3];
+
+          activeDistrict.style.fill = previousFill;
 
           activeDistrict.style.stroke = "#718096";
           activeDistrict.style.strokeWidth = "1";
           activeDistrict.style.filter =
             "brightness(1.06) drop-shadow(0 0 6px rgba(80,120,140,.25))";
         }
-
-        district.style.fill = "#C96A28";
-        district.style.stroke = "#8B4513";
-        district.style.strokeWidth = "2";
-        district.style.filter =
-          "brightness(1.08) saturate(1.15) drop-shadow(0 0 10px rgba(201,106,40,.35))";
 
         activeDistrict = district;
 
@@ -198,8 +215,15 @@ export default function HimachalVectorMap({
           x: left,
           y: top,
         }));
+        
       });
     });
+    return () => {
+      districts.forEach((district) => {
+        const clone = district.cloneNode(true);
+        district.replaceWith(clone);
+      });
+    };
   }, [onSelectDistrict, selectedDistrict, districtCounts, grievances]);
 
   return (
@@ -276,39 +300,43 @@ export default function HimachalVectorMap({
           <HimachalDistricts className="max-h-full max-w-full transition-all duration-300" />
         </div>
 
+        
         {/* 4. Traditional Floating HUD Filter Tab */}
-        <div className="absolute bottom-5 left-5 rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-lg">
-          <p className="text-[10px] uppercase tracking-widest text-slate-500">
-            Active Filter
+        <div className="absolute bottom-5 right-5 rounded-xl border border-stone-200 bg-white/95 backdrop-blur-sm p-4 shadow-xl w-60">
+        
+          <p className="text-[10px] uppercase tracking-widest font-bold mb-3 text-slate-600">
+            INCIDENT DENSITY
           </p>
 
-          <p className="mt-1 font-bold text-[var(--devdar-forest)]">
-            {selectedDistrict || "Entire Himachal Pradesh"}
-          </p>
-        </div>
-
-        <div className="absolute bottom-5 right-5 rounded-lg bg-white border border-stone-200 p-4 shadow-lg">
-          <p className="text-[10px] uppercase tracking-widest font-bold mb-3">
-            Incident Density
-          </p>
-
-          <div className="space-y-2 text-xs">
+          <div className="space-y-3 text-sm">
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-red-600"></span>
-              Critical
+              <span className="h-3 w-3 rounded-full bg-[#DCE8FA]" />
+              <span>Low</span>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-amber-500"></span>
-              High
+              <span className="h-3 w-3 rounded-full bg-[#BDD3F4]" />
+              <span>Moderate</span>
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-slate-500"></span>
-              Normal
+              <span className="h-3 w-3 rounded-full bg-[#8FB4E6]" />
+              <span>High</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full bg-[#5E8DC8]" />
+              <span>Critical</span>
+            </div>
+
+            <div className="border-t border-stone-200 pt-2 text-xs text-slate-500">
+              Darker shades indicate higher complaint density within each
+              district's cultural color palette.
             </div>
           </div>
         </div>
+        
+
         {tooltip && (
           <div
             className="absolute z-50 w-64 rounded-xl border border-stone-200 bg-white/95 backdrop-blur-sm shadow-2xl px-4 py-3 pointer-events-none"
