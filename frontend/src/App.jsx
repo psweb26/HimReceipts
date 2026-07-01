@@ -598,6 +598,12 @@ function CivicPillar({
     });
   }, [grievances, selectedDistrict]);
 
+  <HimachalVectorMap
+    selectedDistrict={selectedDistrict}
+    onSelectDistrict={setSelectedDistrict}
+    grievances={grievances}
+/>
+
   const latestFromState = latestTicket
     ? grievances.find((ticket) => ticket.id === latestTicket.id) || latestTicket
     : null;
@@ -674,8 +680,8 @@ function CivicPillar({
         </div>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-        <section className="kathkuni-card bg-white p-6">
+      <div className="grid gap-8 lg:grid-cols-[520px_1fr] items-stretch">
+        <section className="kathkuni-card bg-white p-6 h-full">
           <PanelHeader
             eyebrow="Community Intake Portal"
             icon={Send}
@@ -813,100 +819,98 @@ function CivicPillar({
           </form>
         </section>
 
-        <div className="grid gap-6">
+        <div className="h-full min-h-[760px]">
           <HimachalVectorMap
             selectedDistrict={selectedDistrict}
             onSelectDistrict={setSelectedDistrict}
             grievances={grievances}
           />
         </div>
+      </div>
 
-          <section className="kathkuni-card bg-white p-6">
-            <PanelHeader
-              eyebrow="Intake Result"
-              icon={TimerReset}
-              title="Live Ticket Telemetry State"
-            />
+        <section className="mt-8 kathkuni-card bg-white p-8">
+          <PanelHeader
+            eyebrow="Intake Result"
+            icon={TimerReset}
+            title="Live Ticket Telemetry State"
+          />
 
-            {latestFromState ? (
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
-                <MetricPill
-                  label="Ticket Identification ID"
-                  value={latestFromState.id}
-                />
-                <MetricPill
-                  label="Risk Priority Rank"
-                  value={priorityLabel[getEffectivePriority(latestFromState)]}
-                />
-                <MetricPill
-                  label="Aggregated Upvotes"
-                  value={latestFromState.upvotes}
-                />
-                <MetricPill
-                  label="SLA Target Boundary"
-                  value={formatDateTime(latestFromState.slaDueAt)}
-                />
-                <div className="sm:col-span-2">
-                  <MetricPill
-                    label="Current Status Timeline Track"
-                    value={formatSlaStatus(latestFromState, nowMs)}
-                  />
-                </div>
-              </div>
-            ) : (
-              <EmptyState
-                detail="Registered structural faults appear here immediately for logging tracking verification."
-                icon={FileText}
-                title="No Active Local Ticket State Listed"
+          {latestFromState ? (
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <MetricPill
+                label="Ticket Identification ID"
+                value={latestFromState.id}
               />
-            )}
-          </section>
-
-          <section className="kathkuni-card bg-white p-6">
-            <PanelHeader
-              eyebrow="Community Discovery"
-              icon={ArrowBigUp}
-              title="Highest Supported Citizen Reports"
+              <MetricPill
+                label="Risk Priority Rank"
+                value={priorityLabel[getEffectivePriority(latestFromState)]}
+              />
+              <MetricPill
+                label="Aggregated Upvotes"
+                value={latestFromState.upvotes}
+              />
+              <MetricPill
+                label="SLA Target Boundary"
+                value={formatDateTime(latestFromState.slaDueAt)}
+              />
+              <div className="sm:col-span-2">
+                <MetricPill
+                  label="Current Status Timeline Track"
+                  value={formatSlaStatus(latestFromState, nowMs)}
+                />
+              </div>
+            </div>
+          ) : (
+            <EmptyState
+              detail="Registered structural faults appear here immediately for logging tracking verification."
+              icon={FileText}
+              title="No Active Local Ticket State Listed"
             />
+          )}
+        </section>
 
-            <p className="mt-2 text-xs text-slate-500">
-              Community reported incidents ranked by public support. Reports
-              with the highest engagement surface first for greater visibility
-              and accountability.
-            </p>
-            <div className="mt-5 flex flex-wrap gap-2">
-              <button className="rounded-full bg-[var(--devdar-forest)] px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white">
-                🔥 Trending
-              </button>
+        <section className="mt-8 kathkuni-card bg-white p-8">
+          <PanelHeader
+            eyebrow="Community Discovery"
+            icon={ArrowBigUp}
+            title="Highest Supported Citizen Reports"
+          />
 
-              <button className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50">
-                Latest
-              </button>
+          <p className="mt-2 text-xs text-slate-500">
+            Community reported incidents ranked by public support. Reports with
+            the highest engagement surface first for greater visibility and
+            accountability.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <button className="rounded-full bg-[var(--devdar-forest)] px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-white">
+              🔥 Trending
+            </button>
 
-              <button className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50">
-                Most Supported
-              </button>
+            <button className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50">
+              Latest
+            </button>
 
-              <button className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50">
-                Pending
-              </button>
-            </div>
+            <button className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50">
+              Most Supported
+            </button>
 
-            <div className="mt-5 grid gap-3.5 max-h-96 overflow-y-auto pr-1">
-              {feed.slice(0, 5).map((ticket) => (
-                <GrievanceFeedCard
-    key={ticket.id}
-    ticket={ticket}
-    onUpvote={onUpvote}
-    onViewDetails={setSelectedTicket}
-/>
-              ))}
-            </div>
-          </section>
-  </div>
-    
+            <button className="rounded-full border border-slate-300 bg-white px-4 py-2 text-[11px] font-bold uppercase tracking-wide text-slate-600 hover:bg-slate-50">
+              Pending
+            </button>
+          </div>
 
-        {selectedTicket && (
+          <div className="mt-5 grid gap-3.5 max-h-96 overflow-y-auto pr-1">
+            {feed.slice(0, 5).map((ticket) => (
+              <GrievanceFeedCard
+                key={ticket.id}
+                ticket={ticket}
+                onUpvote={onUpvote}
+                onViewDetails={setSelectedTicket}
+              />
+            ))}
+          </div>
+        </section>
+      {selectedTicket && (
   <ResolutionModal
     ticket={selectedTicket}
     onClose={() => setSelectedTicket(null)}
@@ -1976,11 +1980,7 @@ function SwipeModal({
   );
 }
 
-function GrievanceFeedCard({
-  ticket,
-  onUpvote,
-  onViewDetails,
-}) {
+function GrievanceFeedCard({ ticket, onUpvote, onViewDetails }) {
   const effectivePriority = getEffectivePriority(ticket);
   const isCluster = ticket.upvotes > UPVOTE_CRITICAL_THRESHOLD;
 
@@ -2011,84 +2011,76 @@ function GrievanceFeedCard({
           />
         </div>
         <div className="flex flex-1 flex-col justify-between">
+          <div className="min-w-0 flex-1">
+            <h3 className="text-lg font-bold text-[var(--devdar-forest)] leading-snug">
+              {ticket.title}
+            </h3>
 
-  <div className="min-w-0 flex-1">
+            <p className="mt-1 text-sm text-slate-500">
+              📍 {ticket.district} / {ticket.block} / {ticket.panchayat}
+            </p>
 
-    <h3 className="text-lg font-bold text-[var(--devdar-forest)] leading-snug">
-      {ticket.title}
-    </h3>
+            <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
+              {ticket.description}
+            </p>
 
-    <p className="mt-1 text-sm text-slate-500">
-      📍 {ticket.district} / {ticket.block} / {ticket.panchayat}
-    </p>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <span
+                className={cx(
+                  "inline-flex items-center border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-xs",
+                  localPriorityStyles[effectivePriority],
+                )}
+              >
+                {priorityLabel[effectivePriority]}
+              </span>
 
-    <p className="mt-2 line-clamp-2 text-sm leading-6 text-slate-600">
-      {ticket.description}
-    </p>
+              <span
+                className={cx(
+                  "inline-flex items-center border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-xs",
+                  localStatusStyles[ticket.status],
+                )}
+              >
+                {ticket.status}
+              </span>
 
-    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {isCluster && (
+                <span className="border border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)] text-[9px] uppercase tracking-wider rounded-xs py-0.5 px-2 font-bold animate-pulse">
+                  💥 High Threat Emergency
+                </span>
+              )}
+            </div>
+          </div>
 
-      <span
-        className={cx(
-          "inline-flex items-center border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-xs",
-          localPriorityStyles[effectivePriority],
-        )}
-      >
-        {priorityLabel[effectivePriority]}
-      </span>
+          <div className="mt-4 flex items-center gap-2">
+            <button
+              className="inline-flex h-8 items-center justify-center gap-1.5 rounded-sm border border-[var(--dry-wool)] bg-[#F5F7FA] px-3 text-xs font-bold font-mono text-[var(--devdar-forest)] transition hover:bg-slate-100"
+              onClick={() => onUpvote(ticket.id)}
+              type="button"
+            >
+              <ThumbsUp className="h-3.5 w-3.5 text-[var(--pahadi-crimson)]" />
+              {ticket.upvotes}
+            </button>
 
-      <span
-        className={cx(
-          "inline-flex items-center border px-2 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded-xs",
-          localStatusStyles[ticket.status],
-        )}
-      >
-        {ticket.status}
-      </span>
+            <button
+              className="inline-flex h-8 items-center justify-center rounded-sm border border-slate-300 bg-white px-3 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
+              onClick={() => onViewDetails(ticket)}
+              type="button"
+            >
+              View Details
+            </button>
 
-      {isCluster && (
-        <span className="border border-[var(--pahadi-crimson)] bg-rose-50 text-[var(--pahadi-crimson)] text-[9px] uppercase tracking-wider rounded-xs py-0.5 px-2 font-bold animate-pulse">
-          💥 High Threat Emergency
-        </span>
-      )}
-
-    </div>
-
-  </div>
-
-  <div className="mt-4 flex items-center gap-2">
-
-  <button
-    className="inline-flex h-8 items-center justify-center gap-1.5 rounded-sm border border-[var(--dry-wool)] bg-[#F5F7FA] px-3 text-xs font-bold font-mono text-[var(--devdar-forest)] transition hover:bg-slate-100"
-    onClick={() => onUpvote(ticket.id)}
-    type="button"
-  >
-    <ThumbsUp className="h-3.5 w-3.5 text-[var(--pahadi-crimson)]" />
-    {ticket.upvotes}
-  </button>
-
-  <button
-  className="inline-flex h-8 items-center justify-center rounded-sm border border-slate-300 bg-white px-3 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
-  onClick={() => onViewDetails(ticket)}
-  type="button"
->
-  View Details
-</button>
-
-  <button
-    className="inline-flex h-8 items-center justify-center rounded-sm border border-slate-300 bg-white px-3 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
-    type="button"
-  >
-    Share
-  </button>
-
-</div>
-      </div>
+            <button
+              className="inline-flex h-8 items-center justify-center rounded-sm border border-slate-300 bg-white px-3 text-xs font-bold uppercase tracking-wider hover:bg-slate-50"
+              type="button"
+            >
+              Share
+            </button>
+          </div>
+        </div>
       </div>
     </article>
   );
 }
-
 
 function ResolutionModal({ ticket, onClose, onResolve, onVeto }) {
   const [resolutionNotes, setResolutionNotes] = useState("");

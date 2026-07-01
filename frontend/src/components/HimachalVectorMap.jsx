@@ -1,111 +1,259 @@
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { MapPin } from "lucide-react";
 
 // SVG coordinate boundaries for active regions
-const DISTRICT_PATHS = [
-  { id: "Lahaul & Spiti", name: "Lahaul & Spiti", path: "M 90,20 L 165,35 L 175,90 L 125,110 L 75,80 Z" },
-  { id: "Kangra", name: "Kangra", path: "M 25,70 L 70,65 L 75,100 L 45,120 L 20,100 Z" },
-  { id: "Kullu", name: "Kullu", path: "M 80,85 L 120,115 L 105,150 L 70,130 Z" },
-  { id: "Mandi", name: "Mandi", path: "M 50,125 L 70,130 L 85,165 L 45,160 Z" },
-  { id: "Shimla", name: "Shimla", path: "M 90,170 L 135,155 L 145,190 L 105,210 Z" }
-];
+import HimachalDistricts from "../assets/himachal_districts.svg?react";
 
-export default function HimachalVectorMap({ selectedDistrict, onSelectDistrict, grievances = [] }) {
-  // Compute active complaint load metrics per district
-  const loadMetrics = useMemo(() => {
+const DISTRICT_COLORS = {
+  Chamba: "#C8D7F0", // Mist Blue
+  Kangra: "#E7C8C2", // Apple Blossom
+  Una: "#DDE8C8", // Terrace Green
+  Hamirpur: "#EFDDB8", // Wheat Gold
+  Bilaspur: "#C9D8D3", // River Stone
+  Solan: "#D4E4D2", // Pine Meadow
+  Sirmaur: "#D8C8E6", // Lavender Hills
+  Shimla: "#E8E1C7", // Heritage Cream
+  Kinnaur: "#E7CFC4", // Apricot Clay
+  "Lahaul & Spiti": "#D7DDEB", // Glacier Blue
+  Mandi: "#DCCFC3", // Cedar Wood
+  Kullu: "#EAD8DF", // Rhododendron Pink
+};
+
+const DISTRICT_NAME_MAP = {
+  LahaulSpiti: "Lahaul & Spiti",
+  Hamirpur: "Hamirpur",
+  Kangra: "Kangra",
+  Shimla: "Shimla",
+  Kullu: "Kullu",
+  Mandi: "Mandi",
+  Chamba: "Chamba",
+  Bilaspur: "Bilaspur",
+  Una: "Una",
+  Solan: "Solan",
+  Sirmaur: "Sirmaur",
+  Kinnaur: "Kinnaur",
+};
+
+export default function HimachalVectorMap({
+  selectedDistrict,
+  onSelectDistrict,
+  grievances = [],
+}) {
+  const mapContainerRef = useRef(null);
+  const [tooltip, setTooltip] = useState(null);
+  const districtCounts = useMemo(() => {
     const counts = {};
-    DISTRICT_PATHS.forEach(d => {
-      // Handles matching regardless of field id uppercase vs database lowercase strings
-      counts[d.id] = grievances.filter(t => t.district?.toLowerCase() === d.id.toLowerCase()).length;
+
+    grievances.forEach((g) => {
+      counts[g.district] = (counts[g.district] || 0) + 1;
     });
+
     return counts;
   }, [grievances]);
 
-  // Determine a district's fill color based on selection state and severity/volume load
-  const getDistrictFillClass = (isActive, volumeCount) => {
-    if (isActive) return "fill-[var(--pahadi-crimson)]"; // Highlighted Selection
-    if (volumeCount >= 4) return "fill-[var(--devdar-forest)] hover:opacity-90"; // High Risk / Active Canopy
-    if (volumeCount > 0) return "fill-[var(--dry-wool)] hover:opacity-90"; // Moderate Risk Track
-    return "fill-slate-200/70 hover:fill-slate-300/80"; // Pristine / Zero active cases
-  };
+  useEffect(() => {
+    if (!mapContainerRef.current) return;
+
+    const svg = mapContainerRef.current.querySelector("svg");
+    const districts = svg.querySelectorAll("path[id]");
+
+    let activeDistrict = null;
+    districts.forEach((district) => {
+      const districtName = DISTRICT_NAME_MAP[district.id] || district.id;
+
+      const count = districtCounts[districtName] || 0;
+
+      let baseColor;
+
+      if (count === 0) baseColor = DISTRICT_COLORS[district.id] || "#EAEAEA";
+      else if (count <= 2) baseColor = "#B7E4C7";
+      else if (count <= 4) baseColor = "#FFE08A";
+      else if (count <= 6) baseColor = "#F6AD55";
+      else baseColor = "#F56565";
+
+      district.style.fill = baseColor;
+      district.style.stroke = "#718096";
+      district.style.strokeWidth = "1";
+
+      district.style.cursor = "pointer";
+      district.style.transition =
+        "fill .22s ease, filter .22s ease, stroke .22s ease";
+      district.style.filter =
+        "brightness(1.06) drop-shadow(0 0 6px rgba(80,120,140,.25))";
+
+      district.addEventListener("mouseenter", (e) => {
+        district.style.filter = "brightness(1.08) saturate(1.08)";
+        district.style.stroke = "#365C68";
+
+        const rect = mapContainerRef.current.getBoundingClientRect();
+
+        setTooltip({
+          x: e.clientX - rect.left,
+          y: e.clientY - rect.top,
+          district: districtName,
+          reports: districtCounts[districtName] || 0,
+        });
+      });
+
+      district.addEventListener("click", () => {
+        if (activeDistrict) {
+          activeDistrict.style.fill =
+            DISTRICT_COLORS[activeDistrict.id] || "#EAEAEA";
+
+          activeDistrict.style.stroke = "#718096";
+        }
+
+        district.style.fill = "#C96A28"; // selected color
+        district.style.stroke = "#8B4513";
+
+        activeDistrict = district;
+
+        onSelectDistrict?.(DISTRICT_NAME_MAP[district.id] || district.id);
+      });
+
+      district.addEventListener("mouseleave", () => {
+        district.style.filter = "brightness(1) saturate(1)";
+
+        if (district !== activeDistrict) {
+          district.style.stroke = "#718096";
+        }
+        setTooltip(null);
+      });
+
+      district.addEventListener("mousemove", (e) => {
+        setTooltip((t) => ({
+          ...t,
+          x: e.clientX,
+          y: e.clientY,
+        }));
+      });
+    });
+  }, [onSelectDistrict, districtCounts]);
 
   return (
     /* 1. Transformed to a masonry wood-stone structure card */
-    <div className="kathkuni-card bg-white p-5 space-y-4">
+    <div className="kathkuni-card bg-white p-8 h-full flex flex-col">
       <div className="flex items-start justify-between">
         <div>
-          <h4 className="text-[10px] font-black uppercase tracking-wider text-[var(--kinnaur-marigold)]">
-            Geospatial Command Division
-          </h4>
-          <h3 className="text-sm font-bold text-[var(--devdar-forest)] mt-0.5">
-            Regional Territory Map
-          </h3>
-          <p className="text-[11px] text-slate-500 font-medium mt-0.5 leading-relaxed">
-            Select an interactive district path to filter localized telemetry feeds.
+          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[var(--kinnaur-marigold)]">
+            GEOSPATIAL COMMAND DIVISION
+          </p>
+
+          <h2 className="mt-2 text-2xl font-black tracking-tight text-[var(--devdar-forest)]">
+            Himachal Infrastructure Map
+          </h2>
+
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
+            Monitor citizen reported infrastructure incidents across districts.
+            Select a district to filter complaints and view regional activity.
           </p>
         </div>
-        <div className="h-8 w-8 rounded-sm bg-[#F5F7FA] border border-[#D4C5B3] flex items-center justify-center text-[var(--devdar-forest)] shadow-2xs">
-          <MapPin className="h-4 w-4 stroke-[2.5]" />
+
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--devdar-forest)] text-white shadow-sm">
+          <MapPin className="h-6 w-6" />
         </div>
       </div>
 
       {/* 2. Traditional Weave Geometric Divider Strip Accent */}
-      <div className="himachali-weave-divider rounded-xs" />
+      <div className="mt-6 mb-6 border-t border-stone-200" />
 
-      {/* 3. Alpine Framed Interactive Map Vector Viewport */}
-      <div className="relative w-full h-64 bg-[#F5F7FA] rounded-sm border border-[#D4C5B3] flex items-center justify-center p-2 overflow-hidden">
-        <svg viewBox="0 0 200 220" className="w-full h-full drop-shadow-xs select-none">
-          {DISTRICT_PATHS.map((dist) => {
-            const isActive = selectedDistrict?.toLowerCase() === dist.id.toLowerCase();
-            const volumeCount = loadMetrics[dist.id] || 0;
-            
-            return (
-              <g 
-                key={dist.id} 
-                className="group cursor-pointer" 
-                onClick={() => onSelectDistrict && onSelectDistrict(selectedDistrict === dist.id ? "" : dist.id)}
-              >
-                {/* Visual Vector Polygon Shape with structural white lines resembling mountain boundaries */}
-                <path
-                  d={dist.path}
-                  className={`transition-all duration-200 stroke-2 stroke-[var(--spiti-snow)] ${getDistrictFillClass(isActive, volumeCount)}`}
-                />
-                
-                {/* Text Placement Coordinates */}
-                <text
-                  x={dist.id === "Lahaul & Spiti" ? 128 : dist.id === "Kangra" ? 42 : dist.id === "Kullu" ? 94 : dist.id === "Mandi" ? 64 : 118}
-                  y={dist.id === "Lahaul & Spiti" ? 55 : dist.id === "Kangra" ? 90 : dist.id === "Kullu" ? 115 : dist.id === "Mandi" ? 142 : 182}
-                  className={`text-[8px] font-black pointer-events-none tracking-tight transition-colors ${
-                    isActive || volumeCount >= 4 ? "fill-[#F5F7FA]" : "fill-slate-700 group-hover:fill-slate-900"
-                  }`}
-                  textAnchor="middle"
-                >
-                  {dist.name}
-                </text>
-                
-                {/* Separate volume ticker badge count to maintain typography clarity */}
-                {volumeCount > 0 && (
-                  <text
-                    x={dist.id === "Lahaul & Spiti" ? 128 : dist.id === "Kangra" ? 42 : dist.id === "Kullu" ? 94 : dist.id === "Mandi" ? 64 : 118}
-                    y={dist.id === "Lahaul & Spiti" ? 64 : dist.id === "Kangra" ? 98 : dist.id === "Kullu" ? 123 : dist.id === "Mandi" ? 150 : 190}
-                    className={`text-[7px] font-mono font-bold pointer-events-none tabular-nums ${
-                      isActive || volumeCount >= 4 ? "fill-[var(--kinnaur-marigold)]" : "fill-[var(--pahadi-crimson)] font-extrabold"
-                    }`}
-                    textAnchor="middle"
-                  >
-                    ({volumeCount})
-                  </text>
-                )}
-              </g>
-            );
-          })}
-        </svg>
+      <div className="grid grid-cols-4 gap-4 mb-6">
+        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-slate-500">
+            Districts
+          </p>
+          <h3 className="mt-2 text-2xl font-black">12</h3>
+        </div>
 
-        {/* 4. Traditional Floating HUD Filter Tab */}
-        <div className="absolute bottom-2 left-2 bg-[var(--devdar-forest)] text-[#F5F7FA] px-2 py-0.5 rounded-sm text-[9px] font-mono font-bold uppercase tracking-wider border border-[#D4C5B3]/30 shadow-sm">
-          🏔️ Filter: {selectedDistrict || "All Himachal"}
+        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-slate-500">
+            Reports
+          </p>
+          <h3 className="mt-2 text-2xl font-black">{grievances.length}</h3>
+        </div>
+
+        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-slate-500">
+            Critical
+          </p>
+          <h3 className="mt-2 text-2xl font-black text-red-600">
+            {grievances.filter((g) => g.priority === "critical").length}
+          </h3>
+        </div>
+
+        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+          <p className="text-[10px] uppercase tracking-widest text-slate-500">
+            Selected
+          </p>
+          <h3 className="mt-2 text-lg font-bold">
+            {selectedDistrict || "All"}
+          </h3>
         </div>
       </div>
+
+      {/* 3. Alpine Framed Interactive Map Vector Viewport */}
+      <div className="relative h-[550px] rounded-2xl border border-stone-200 bg-[#F8FAFC] overflow-hidden">
+        <div
+          ref={mapContainerRef}
+          className="flex h-full w-full items-center justify-center p-6"
+        >
+          <HimachalDistricts className="max-h-full max-w-full transition-all duration-300" />
+        </div>
+
+        {/* 4. Traditional Floating HUD Filter Tab */}
+        <div className="absolute bottom-5 left-5 rounded-lg border border-stone-200 bg-white px-4 py-3 shadow-lg">
+          <p className="text-[10px] uppercase tracking-widest text-slate-500">
+            Active Filter
+          </p>
+
+          <p className="mt-1 font-bold text-[var(--devdar-forest)]">
+            {selectedDistrict || "Entire Himachal Pradesh"}
+          </p>
+        </div>
+
+        <div className="absolute bottom-5 right-5 rounded-lg bg-white border border-stone-200 p-4 shadow-lg">
+          <p className="text-[10px] uppercase tracking-widest font-bold mb-3">
+            Incident Density
+          </p>
+
+          <div className="space-y-2 text-xs">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-red-600"></span>
+              Critical
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-amber-500"></span>
+              High
+            </div>
+
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-slate-500"></span>
+              Normal
+            </div>
+          </div>
+        </div>
+      </div>
+      {tooltip && (
+        <div
+          style={{
+            left: tooltip.x + 15,
+            top: tooltip.y + 15,
+          }}
+          className="..."
+        >
+          <div
+            className="absolute z-50 rounded-lg border border-stone-200 bg-white px-3 py-2 shadow-xl text-sm pointer-events-none"
+            style={{
+              left: tooltip.x + 15,
+              top: tooltip.y + 15,
+            }}
+          >
+            <p className="font-semibold">{tooltip.district}</p>
+            <p className="text-slate-500">{tooltip.reports} reports</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
