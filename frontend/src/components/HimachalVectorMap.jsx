@@ -56,7 +56,7 @@ export default function HimachalVectorMap({
   grievances = [],
 }) {
   const mapContainerRef = useRef(null);
-  const [tooltip, setTooltip] = useState(null); 
+  const [tooltip, setTooltip] = useState(null);
 
   const filteredGrievances = useMemo(() => {
     if (!selectedDistrict) return grievances;
@@ -109,12 +109,13 @@ export default function HimachalVectorMap({
 
       district.style.cursor = "pointer";
       district.style.transition =
-        "fill .28s ease-in-out, stroke .28s ease-in-out, filter .28s ease-in-out";
+        "fill .25s ease, stroke .25s ease, filter .25s ease";
+
       district.style.filter =
         "brightness(1.06) drop-shadow(0 0 6px rgba(80,120,140,.25))";
 
       district.addEventListener("mouseenter", (e) => {
-        district.style.filter = "brightness(1.08) saturate(1.08)";
+        district.style.filter = "brightness(1.12) saturate(1.12)";
         district.style.stroke = "#365C68";
 
         const districtGrievances = grievances.filter(
@@ -134,8 +135,6 @@ export default function HimachalVectorMap({
           resolved: districtGrievances.filter((g) => g.status === "resolved")
             .length,
         });
-
-    
       });
 
       district.addEventListener("click", () => {
@@ -172,6 +171,19 @@ export default function HimachalVectorMap({
         activeDistrict = district;
 
         const clickedDistrict = DISTRICT_NAME_MAP[district.id] || district.id;
+
+        // Apply the darkest shade from this district's palette
+        const clickedShades = DISTRICT_GRADIENTS[clickedDistrict] ?? [
+          "#EEEEEE",
+          "#DDDDDD",
+          "#CCCCCC",
+          "#BBBBBB",
+        ];
+
+        district.style.fill = clickedShades[3];
+        district.style.stroke = "#2D4F58";
+        district.style.strokeWidth = "2";
+        district.style.filter = "brightness(1.12) saturate(1.12)";
 
         if (selectedDistrict === clickedDistrict) {
           onSelectDistrict?.(null);
@@ -215,7 +227,6 @@ export default function HimachalVectorMap({
           x: left,
           y: top,
         }));
-        
       });
     });
     return () => {
@@ -228,21 +239,17 @@ export default function HimachalVectorMap({
 
   return (
     /* 1. Transformed to a masonry wood-stone structure card */
-    <div className="kathkuni-card bg-white p-8 h-full flex flex-col">
+    <div className="kathkuni-card bg-white p-6 h-full flex flex-col">
       <div className="flex items-start justify-between">
         <div>
-          <p className="text-[11px] font-bold uppercase tracking-[0.28em] text-[var(--kinnaur-marigold)]">
+          <p className="text-[10px] font-black uppercase tracking-widest text-[var(--kinnaur-marigold)]">
             GEOSPATIAL COMMAND DIVISION
           </p>
 
-          <h2 className="mt-2 text-2xl font-black tracking-tight text-[var(--devdar-forest)]">
-            Himachal Infrastructure Map
+          {/* Main Heading */}
+          <h2 className="mt-1 text-base font-black text-[var(--devdar-forest)] uppercase tracking-tight">
+            क्षेत्र निगरानी: GEOSPATIAL INCIDENT LEDGER
           </h2>
-
-          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-500">
-            Monitor citizen reported infrastructure incidents across districts.
-            Select a district to filter complaints and view regional activity.
-          </p>
         </div>
 
         <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-[var(--devdar-forest)] text-white shadow-sm">
@@ -251,37 +258,37 @@ export default function HimachalVectorMap({
       </div>
 
       {/* 2. Traditional Weave Geometric Divider Strip Accent */}
-      <div className="mt-6 mb-6 border-t border-stone-200" />
+      <div className="mt-5 mb-5 border-t border-stone-200" />
 
       <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+        <div className="rounded-lg border border-stone-200 bg-stone-50 py-3 px-4">
           <p className="text-[10px] uppercase tracking-widest text-slate-500">
             Districts
           </p>
-          <h3 className="mt-2 text-2xl font-black">
+          <h3 className="mt-2 text-xl font-black">
             {selectedDistrict ? 1 : 12}
           </h3>
         </div>
 
-        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+        <div className="rounded-lg border border-stone-200 bg-stone-50 py-3 px-4">
           <p className="text-[10px] uppercase tracking-widest text-slate-500">
             Reports
           </p>
-          <h3 className="mt-2 text-2xl font-black">
+          <h3 className="mt-2 text-xl font-black">
             {filteredGrievances.length}
           </h3>
         </div>
 
-        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+        <div className="rounded-lg border border-stone-200 bg-stone-50 py-3 px-4">
           <p className="text-[10px] uppercase tracking-widest text-slate-500">
             Critical
           </p>
-          <h3 className="mt-2 text-2xl font-black text-red-600">
+          <h3 className="mt-2 text-xl font-black text-red-600">
             {filteredGrievances.filter((g) => g.priority === "critical").length}
           </h3>
         </div>
 
-        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4">
+        <div className="rounded-lg border border-stone-200 bg-stone-50 py-3 px-4">
           <p className="text-[10px] uppercase tracking-widest text-slate-500">
             Selected
           </p>
@@ -292,7 +299,7 @@ export default function HimachalVectorMap({
       </div>
 
       {/* 3. Alpine Framed Interactive Map Vector Viewport */}
-      <div className="relative h-[550px] rounded-2xl border border-stone-200 bg-[#F8FAFC] overflow-hidden">
+      <div className="relative h-[540px] rounded-2xl border border-stone-200 bg-[#F8FAFC] overflow-hidden">
         <div
           ref={mapContainerRef}
           className="flex h-full w-full items-center justify-center p-6"
@@ -300,10 +307,9 @@ export default function HimachalVectorMap({
           <HimachalDistricts className="max-h-full max-w-full transition-all duration-300" />
         </div>
 
-        
         {/* 4. Traditional Floating HUD Filter Tab */}
+
         <div className="absolute bottom-5 right-5 rounded-xl border border-stone-200 bg-white/95 backdrop-blur-sm p-4 shadow-xl w-60">
-        
           <p className="text-[10px] uppercase tracking-widest font-bold mb-3 text-slate-600">
             INCIDENT DENSITY
           </p>
@@ -335,7 +341,6 @@ export default function HimachalVectorMap({
             </div>
           </div>
         </div>
-        
 
         {tooltip && (
           <div
