@@ -318,13 +318,13 @@ export default function HimachalVectorMap({
             <span className="text-slate-500">Low</span>
 
             <div
-              className="flex-1 mx-3 h-2 rounded-full bg-gradient-to-r
+              className="flex-1 mx-2 h-1.5 rounded-full bg-gradient-to-r
                   from-[#E5ECF7]
 via-[#A7BBD8]
 to-[#2D4F58]"
             />
 
-            <span className="text-slate-500">High</span>
+            <span className="text-slate-400">High</span>
           </div>
 
           <p className="mt-2 text-[10px] leading-5 text-slate-500">
@@ -335,7 +335,7 @@ to-[#2D4F58]"
 
         {tooltip && (
           <div
-            className="absolute z-50 w-64 rounded-xl border border-stone-200
+            className="absolute z-50 w-64 rounded-xl border border-stone-300
                bg-white/95 backdrop-blur-sm shadow-2xl
                px-4 py-3 pointer-events-none"
             style={{
