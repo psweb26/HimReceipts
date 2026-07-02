@@ -164,8 +164,8 @@ export default function HimachalVectorMap({
 
           activeDistrict.style.stroke = "#718096";
           activeDistrict.style.strokeWidth = "1";
-          activeDistrict.style.filter =
-            "brightness(1.06) drop-shadow(0 0 6px rgba(80,120,140,.25))";
+          district.style.filter =
+            "brightness(1.1) saturate(1.18) drop-shadow(0 0 8px rgba(45,79,88,.25))";
         }
 
         activeDistrict = district;
@@ -302,49 +302,42 @@ export default function HimachalVectorMap({
       <div className="relative h-[540px] rounded-2xl border border-stone-200 bg-[#F8FAFC] overflow-hidden">
         <div
           ref={mapContainerRef}
-          className="flex h-full w-full items-center justify-center p-6"
+          className="flex h-[485px] w-full items-center justify-center p-6"
         >
           <HimachalDistricts className="max-h-full max-w-full transition-all duration-300" />
         </div>
 
         {/* 4. Traditional Floating HUD Filter Tab */}
+        <div
+          className="absolute bottom-0 left-0 right-0
+                border-t border-stone-200
+                bg-white/90 backdrop-blur-sm
+                px-8 py-4"
+        >
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-slate-500">Low</span>
 
-        <div className="absolute bottom-5 right-5 rounded-xl border border-stone-200 bg-white/95 backdrop-blur-sm p-4 shadow-xl w-60">
-          <p className="text-[10px] uppercase tracking-widest font-bold mb-3 text-slate-600">
-            INCIDENT DENSITY
-          </p>
+            <div
+              className="flex-1 mx-3 h-2 rounded-full bg-gradient-to-r
+                  from-[#E5ECF7]
+via-[#A7BBD8]
+to-[#2D4F58]"
+            />
 
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-[#DCE8FA]" />
-              <span>Low</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-[#BDD3F4]" />
-              <span>Moderate</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-[#8FB4E6]" />
-              <span>High</span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <span className="h-3 w-3 rounded-full bg-[#5E8DC8]" />
-              <span>Critical</span>
-            </div>
-
-            <div className="border-t border-stone-200 pt-2 text-xs text-slate-500">
-              Darker shades indicate higher complaint density within each
-              district's cultural color palette.
-            </div>
+            <span className="text-slate-500">High</span>
           </div>
+
+          <p className="mt-2 text-[10px] leading-5 text-slate-500">
+            Darker shades indicate higher complaint density while preserving
+            each district's cultural color palette.
+          </p>
         </div>
 
         {tooltip && (
           <div
-            className="absolute z-50 w-64 rounded-xl border border-stone-200 bg-white/95 backdrop-blur-sm shadow-2xl px-4 py-3 pointer-events-none"
+            className="absolute z-50 w-64 rounded-xl border border-stone-200
+               bg-white/95 backdrop-blur-sm shadow-2xl
+               px-4 py-3 pointer-events-none"
             style={{
               left: tooltip.x,
               top: tooltip.y,
